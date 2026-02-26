@@ -296,25 +296,3 @@ export async function crawlCommentsOnce(
     isCrawling = false;
   }
 }
-
-/**
- * クローラーが有効になるまで待機する
- */
-export async function waitUntilCrawlerEnabled(): Promise<void> {
-  const currentEnabled = await storage.getItem<boolean>(STORAGE_KEYS.CRAWLER_ENABLED);
-  if (currentEnabled) return;
-
-  return new Promise<void>((resolve) => {
-    const listener = (
-      changes: Record<string, { oldValue?: boolean; newValue?: boolean }>,
-      area: string
-    ) => {
-      const key = STORAGE_KEYS.CRAWLER_ENABLED.replace('local:', '');
-      if (area === 'local' && changes[key]?.newValue === true) {
-        browser.storage.onChanged.removeListener(listener);
-        resolve();
-      }
-    };
-    browser.storage.onChanged.addListener(listener);
-  });
-}

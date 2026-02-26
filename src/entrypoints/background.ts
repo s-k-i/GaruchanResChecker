@@ -4,7 +4,7 @@
  * 
  * 主要機能:
  * - コメントエントリーのCRUD操作とストレージ管理
- * - 定期的なクローリングによる返信数の更新
+ * - chrome.alarms による定期クローリング
  * - 未読バッジの管理と表示
  * - content script/popup間のメッセージング
  * - タブアクティベーションに応じたアイコン切り替え
@@ -33,9 +33,7 @@ import {
 } from '../services/comment-service';
 import {
   crawlCommentsOnce,
-  waitUntilCrawlerEnabled,
 } from '../services/crawler-service';
-import { sleep } from '../services/storage-service';
 import { routeMessage } from '../services/message-handler';
 import {
   STORAGE_KEYS,
@@ -108,6 +106,23 @@ async function recomputeBadge(): Promise<void> {
     Logger.error('バッジ再計算でエラーが発生しました', e);
   }
 }
+
+/**
+ * 次のクロールアラームを登録する
+ * @description 既存アラームを削除してから delayInMinutes で登録し直す。
+ * クロール完了後と起動時の両方から呼ばれる。
+ */
+async function scheduleNextCrawl(): Promise<void> {
+  try {
+    await browser.alarms.create(CRAWLER_CONFIG.ALARM_NAME, {
+      delayInMinutes: CRAWLER_CONFIG.ALARM_DELAY_MINUTES,
+    });
+    Logger.info('次のクロールアラームを登録しました');
+  } catch (e) {
+    Logger.error('クロールアラームの登録に失敗しました', e);
+  }
+}
+
 export default defineBackground(() => {
   Logger.info('バックグラウンドを初期化しました', { id: browser.runtime.id });
 
@@ -184,50 +199,48 @@ export default defineBackground(() => {
     }
   });
 
-  // クローラーループ
+  // クローラー: chrome.alarms で定期的に SW を起動してクロールする（MV3対応）
+  // ※ SW はアイドル時に強制終了されるため while+sleep は使えない。alarms は SW 停止中でも発火する。
+  browser.alarms.onAlarm.addListener(async (alarm: any) => {
+    if (alarm.name !== CRAWLER_CONFIG.ALARM_NAME) return;
+
+    const enabled = (await storage.getItem<boolean>(STORAGE_KEYS.CRAWLER_ENABLED)) ?? true;
+    if (!enabled) {
+      Logger.info('クローラーアラーム: 停止中のためスキップします');
+      // 停止中でも次のアラームは登録しておく（再開時に1分待たずに拾えるよう）
+      await scheduleNextCrawl();
+      return;
+    }
+
+    // SW 再起動直後はインメモリキャッシュが空なので必ず再ロードする
+    await loadCacheFromStorage();
+    const list = getAllCommentsFromCache();
+    Logger.info('クローラーアラーム: クロールを開始します', { count: list.length });
+    await crawlCommentsOnce(list, getCommentFromCache, saveComment, adjustUnread);
+
+    // クロール完了後に次のアラームを登録
+    await scheduleNextCrawl();
+  });
+
+  // アラーム初期設定（SW 再起動のたびに呼ばれるが、既存アラームがあれば再登録しない）
   (async () => {
     try {
-      Logger.info('クローラーループを開始します');
-
-      // 初回デフォルト: 値が未設定なら有効化しておく
+      // 初回デフォルト: クローラーフラグ有効化フラグが未設定なら有効化しておく
       const saved = await storage.getItem<boolean>(STORAGE_KEYS.CRAWLER_ENABLED);
       if (saved === undefined || saved === null) {
         await storage.setItem(STORAGE_KEYS.CRAWLER_ENABLED, true);
         Logger.info('クローラーを有効化しました（デフォルト設定）');
       }
 
-      const IDLE_DELAY_MS = CRAWLER_CONFIG.IDLE_DELAY_MS;
-      const ACTIVE_DELAY_MS = CRAWLER_CONFIG.ACTIVE_DELAY_MS;
-
-      while (true) {
-        const enabled = (await storage.getItem<boolean>(STORAGE_KEYS.CRAWLER_ENABLED)) ?? true;
-        if (!enabled) {
-          Logger.info('クローラー: 停止中。再開を待ちます');
-          await waitUntilCrawlerEnabled();
-          continue;
-        }
-
-        const list = getAllCommentsFromCache();
-        const updatedCount = await crawlCommentsOnce(list, getCommentFromCache, saveComment, adjustUnread);
-
-        if (updatedCount === 0) {
-          await sleep(IDLE_DELAY_MS);
-        } else {
-          await sleep(ACTIVE_DELAY_MS);
-        }
-
-        // 待機後に停止フラグを確認して反映
-        try {
-          const enabledAfterWait = (await storage.getItem<boolean>(STORAGE_KEYS.CRAWLER_ENABLED)) ?? true;
-          if (!enabledAfterWait) {
-            Logger.info('クローラーループ: 待機後に停止フラグが検出されたため次回は停止します');
-          }
-        } catch (e) {
-          Logger.warn('クローラーループ: 待機後の enabled 読み取りに失敗しましたが継続します', e);
-        }
+      // 既存アラームがなければ新規登録（SW 再起動毎に重複登録されるのを防ぐ）
+      const existing = await browser.alarms.get(CRAWLER_CONFIG.ALARM_NAME);
+      if (!existing) {
+        await scheduleNextCrawl();
+      } else {
+        Logger.info('クローラーアラームは既に登録済みです');
       }
     } catch (e) {
-      Logger.error('クローラーループでエラーが発生しました', e);
+      Logger.error('クローラーアラームの設定に失敗しました', e);
     }
   })();
 

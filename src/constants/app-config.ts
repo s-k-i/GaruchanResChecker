@@ -7,12 +7,14 @@
  * クローラー設定
  */
 export const CRAWLER_CONFIG = {
-  /** アクティブ時の待機時間（ミリ秒） */
+  /** コメント1件チェックごとの待機時間（ミリ秒） */
   ACTIVE_DELAY_MS: 3000,
-  /** アイドル時の待機時間（ミリ秒） */
-  IDLE_DELAY_MS: 60_000,
   /** スキップする経過日数 */
   SKIP_AFTER_DAYS: 31,
+  /** クローラーアラーム名 */
+  ALARM_NAME: 'garuchan-crawler',
+  /** クロール完了から次回クロール開始までの待機時間（分）。Chrome の制約により最小値は 1 分 */
+  ALARM_DELAY_MINUTES: 1,
 } as const;
 
 /**
@@ -212,18 +214,8 @@ export const CONTEXT_MENU_CONFIG = {
  * 入力検証設定
  */
 export const VALIDATION_CONFIG = {
-  /** トピックID/コメント番号の最小桁数 */
-  ID_MIN_DIGITS: 1,
-  /** トピックID/コメント番号の最大桁数 */
-  ID_MAX_DIGITS: 10,
-  /** トピックIDの最小桁数（URL検証用） */
-  TOPIC_ID_MIN_DIGITS_IN_URL: 4,
   /** コメント本文のデフォルト最大文字数 */
   DEFAULT_MAX_TEXT_LENGTH: 10000,
-  /** 数値範囲のデフォルト最小値 */
-  DEFAULT_MIN_NUMBER: 0,
-  /** 数値範囲のデフォルト最大値 */
-  DEFAULT_MAX_NUMBER: Number.MAX_SAFE_INTEGER,
 } as const;
 
 /**
@@ -234,6 +226,4 @@ export const VALIDATION_PATTERNS = {
   ID: /^\d{1,10}$/,
   /** トピックURLパターン（/topics/の後に4桁以上の数字、その後は任意） */
   TOPIC_URL: /^\/topics\/\d{4,}/,
-  /** ストレージキープレフィックスパターン */
-  STORAGE_KEY: /^(local|session):.+$/,
 } as const;

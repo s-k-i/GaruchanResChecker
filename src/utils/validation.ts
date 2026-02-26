@@ -2,16 +2,7 @@
  * @file 入力検証ユーティリティ
  * @description セキュリティのための入力検証機能を提供
  */
-import { VALIDATION_CONFIG, VALIDATION_PATTERNS, SITE_CONFIG } from '../constants/app-config';
-
-/**
- * 文字列が数値のみで構成されているかを検証する
- * @param value - 検証する文字列
- * @returns 数値のみの場合はtrue
- */
-export function isNumericString(value: string): boolean {
-  return /^\d+$/.test(value);
-}
+import { VALIDATION_CONFIG, VALIDATION_PATTERNS } from '../constants/app-config';
 
 /**
  * トピックIDの形式を検証する
@@ -96,26 +87,6 @@ export function validateCommentNumber(commentNumber: string): boolean {
 }
 
 /**
- * URLが許可されたドメインであるかを検証する
- * @param url - 検証するURL文字列
- * @param allowedDomain - 許可するドメイン（デフォルト: girlschannel.net）
- * @returns 許可されたドメインの場合はtrue
- * @example
- * ```typescript
- * validateUrl('https://girlschannel.net/topics/123'); // => true
- * validateUrl('https://evil.com/topics/123'); // => false
- * ```
- */
-export function validateUrl(url: string, allowedDomain: string = SITE_CONFIG.DOMAIN): boolean {
-  try {
-    const parsed = new URL(url);
-    return parsed.hostname === allowedDomain;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * 安全なURL文字列を構築する
  * @description パスパラメータをエスケープしてXSS攻撃を防ぐ
  * @param baseUrl - ベースURL
@@ -129,19 +100,6 @@ export function buildSafeUrl(baseUrl: string, path: string): string {
 }
 
 /**
- * ストレージキーの形式を検証する
- * @param key - 検証するキー
- * @returns 有効な形式の場合はtrue
- */
-export function validateStorageKey(key: string): boolean {
-  if (!key || typeof key !== 'string') {
-    return false;
-  }
-  
-  return VALIDATION_PATTERNS.STORAGE_KEY.test(key);
-}
-
-/**
  * コメント本文の長さを検証する
  * @param text - 検証するテキスト
  * @param maxLength - 最大文字数（デフォルト: 10000）
@@ -151,31 +109,3 @@ export function validateTextLength(text: string, maxLength: number = VALIDATION_
   return typeof text === 'string' && text.length <= maxLength;
 }
 
-/**
- * ISO 8601形式の日時文字列を検証する
- * @param dateString - 検証する日時文字列
- * @returns 有効なISO 8601形式の場合はtrue
- */
-export function validateISODate(dateString: string): boolean {
-  if (!dateString || typeof dateString !== 'string') {
-    return false;
-  }
-  
-  const date = new Date(dateString);
-  return date.toString() !== 'Invalid Date' && date.toISOString() === dateString;
-}
-
-/**
- * 数値が指定された範囲内にあるかを検証する
- * @param value - 検証する数値
- * @param min - 最小値（デフォルト: 0）
- * @param max - 最大値（デフォルト: Number.MAX_SAFE_INTEGER）
- * @returns 範囲内の場合はtrue
- */
-export function validateNumberRange(
-  value: number,
-  min: number = VALIDATION_CONFIG.DEFAULT_MIN_NUMBER,
-  max: number = VALIDATION_CONFIG.DEFAULT_MAX_NUMBER
-): boolean {
-  return typeof value === 'number' && !Number.isNaN(value) && value >= min && value <= max;
-}

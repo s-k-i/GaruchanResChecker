@@ -19,11 +19,6 @@ import {
 const commentCache = new Map<string, CommentEntry>();
 
 /**
- * キャッシュのロード完了フラグ
- */
-let cacheLoaded = false;
-
-/**
  * キャッシュを全てのストレージからロードする
  */
 export async function loadCacheFromStorage(): Promise<void> {
@@ -36,11 +31,9 @@ export async function loadCacheFromStorage(): Promise<void> {
       commentCache.set(cacheKey, comment);
     }
 
-    cacheLoaded = true;
     Logger.info('キャッシュのロードが完了しました', { count: comments.length });
   } catch (e) {
     Logger.error('キャッシュのロードに失敗しました', e);
-    cacheLoaded = true;
   }
 }
 
