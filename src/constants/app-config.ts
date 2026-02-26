@@ -198,6 +198,8 @@ export const MESSAGE_TYPES = {
   REFRESH_POPUP: 'refresh-popup',
   /** コンテキストメニューからの追跡 */
   TRACK_FROM_CONTEXT_MENU: 'track-from-context-menu',
+  /** 追跡ボタン表示状態変更通知（background → content script ブロードキャスト） */
+  TRACK_BUTTON_VISIBILITY_CHANGED: 'track-button-visibility-changed',
 } as const;
 
 /**

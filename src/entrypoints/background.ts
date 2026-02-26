@@ -41,6 +41,8 @@ import {
   CRAWLER_CONFIG,
   MESSAGE_TYPES,
   CONTEXT_MENU_CONFIG,
+  SITE_CONFIG,
+  URL_PATTERNS,
 } from '../constants/app-config';
 import { isTrackablePageUrl } from '../utils/validation';
 /**
@@ -255,6 +257,10 @@ export default defineBackground(() => {
       // 非同期処理を実行して結果を返す
       (async () => {
         const response = await routeMessage(message, { adjustUnread });
+        // 追跡ボタン表示状態が変更された場合は全タブに通知
+        if (message.type === 'set-track-button-visible' && response.ok) {
+          broadcastTrackButtonVisibility(message.visible);
+        }
         sendResponse(response);
       })();
 
@@ -283,6 +289,32 @@ export default defineBackground(() => {
     }
   });
 });
+
+/**
+ * 追跡ボタン表示状態を全タブにブロードキャストする
+ * @param visible - 追跡ボタンの表示状態
+ */
+function broadcastTrackButtonVisibility(visible: boolean): void {
+  browser.tabs
+    .query({ url: [
+      `${SITE_CONFIG.BASE_URL}${URL_PATTERNS.TOPICS}*`,
+      `${SITE_CONFIG.BASE_URL}${URL_PATTERNS.COMMENT}*`,
+    ] })
+    .then((tabs: Tab[]) => {
+      for (const tab of tabs) {
+        if (!tab.id) continue;
+        browser.tabs
+          .sendMessage(tab.id, {
+            type: MESSAGE_TYPES.TRACK_BUTTON_VISIBILITY_CHANGED,
+            visible,
+          })
+          .catch(() => {
+            // タブが閉じている場合などは無視
+          });
+      }
+    })
+    .catch((e: unknown) => Logger.error('追跡ボタン表示変更のブロードキャストに失敗しました', e));
+}
 
 /**
  * コンテキストメニューの表示/非表示を更新する

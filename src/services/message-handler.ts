@@ -235,7 +235,7 @@ async function handleSetTrackButtonVisible(visible: boolean): Promise<MessageRes
  * 追跡ボタン表示取得ハンドラー
  */
 async function handleGetTrackButtonVisible(): Promise<MessageResponse> {
-  const visible = (await storage.getItem<boolean>(STORAGE_KEYS.TRACK_BUTTON_VISIBLE)) ?? true;
+  const visible = (await storage.getItem<boolean>(STORAGE_KEYS.TRACK_BUTTON_VISIBLE)) ?? false;
   return { ok: true, visible };
 }
 

@@ -178,6 +178,14 @@ export async function trackCommentFromElement(
 }
 
 /**
+ * 追跡ボタンをすべて削除する
+ */
+export function removeTrackingButtons(): void {
+  document.querySelectorAll(SELECTORS.TRACK_BUTTON).forEach((btn) => btn.remove());
+  Logger.info('追跡ボタンを削除しました');
+}
+
+/**
  * 各コメントに追跡ボタンを追加する
  * @param topicId - トピック ID
  * @param topicTitle - トピックタイトル
@@ -192,7 +200,7 @@ export async function addTrackingButtons(
   const response = await sendMessageSafely<GetTrackButtonVisibleResponse>({
     type: 'get-track-button-visible',
   });
-  const trackButtonVisible = response?.visible ?? true;
+  const trackButtonVisible = response?.visible ?? false;
 
   // 追跡ボタンが非表示の場合は何もしない
   if (!trackButtonVisible) {

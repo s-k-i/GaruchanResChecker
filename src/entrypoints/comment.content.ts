@@ -11,7 +11,7 @@
  */
 import Logger from '../utils/logger';
 import { getTopicId, getTopicTitle } from '../utils/topic-extractor';
-import { addTrackingButtons, trackCommentFromElement } from '../utils/comment-tracking';
+import { addTrackingButtons, trackCommentFromElement, removeTrackingButtons } from '../utils/comment-tracking';
 import { sendMessageSafely } from '../utils/error-handler';
 import { MESSAGE_TYPES, SELECTORS } from '../constants/app-config';
 import type { SetSessionResponse, MessageRequest } from '../types/messages';
@@ -70,6 +70,13 @@ export default defineContentScript({
       browser.runtime.onMessage.addListener((message: MessageRequest) => {
         if (message.type === MESSAGE_TYPES.TRACK_FROM_CONTEXT_MENU && lastContextMenuTarget) {
           trackCommentFromElement(lastContextMenuTarget, topicId, topicTitle, 'context-menu');
+        }
+        if (message.type === MESSAGE_TYPES.TRACK_BUTTON_VISIBILITY_CHANGED) {
+          if (message.visible) {
+            addTrackingButtons(topicId, topicTitle);
+          } else {
+            removeTrackingButtons();
+          }
         }
       });
     } catch (err) {

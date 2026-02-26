@@ -177,6 +177,15 @@ export interface RefreshPopupMessage extends BaseMessage {
 }
 
 /**
+ * 追跡ボタン表示状態変更通知
+ * @description backgroundからcontent scriptへブロードキャストする通知
+ */
+export interface TrackButtonVisibilityChangedMessage extends BaseMessage {
+  type: 'track-button-visibility-changed';
+  visible: boolean;
+}
+
+/**
  * すべてのメッセージリクエスト型のユニオン
  * @description background scriptで受信可能な全てのメッセージ型
  */
@@ -194,7 +203,8 @@ export type MessageRequest =
   | SetSessionRequest
   | GetSessionRequest
   | TrackFromContextMenuRequest
-  | RefreshPopupMessage;
+  | RefreshPopupMessage
+  | TrackButtonVisibilityChangedMessage;
 
 /**
  * すべてのメッセージレスポンス型のユニオン
