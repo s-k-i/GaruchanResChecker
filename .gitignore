@@ -11,6 +11,7 @@
 
 # Track these files in the root
 !.gitignore
+!.gitattributes
 !package.json
 !package-lock.json
 !tsconfig.json
