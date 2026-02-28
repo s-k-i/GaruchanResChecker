@@ -17,7 +17,26 @@
 import { storage } from '#imports';
 import Logger from '../utils/logger';
 import type { CommentEntry } from '../types/comment';
-import { STORAGE_KEYS, OPTIMISTIC_LOCK } from '../constants/app-config';
+import { LOCAL_STORAGE_KEYS, OPTIMISTIC_LOCK } from '../constants/app-config';
+import { sleep } from '../utils/async';
+
+/**
+ * 生キー名に `local:` プレフィックスを付与して WXT storage API 用キーを返す
+ * @param key - `LOCAL_STORAGE_KEYS` の値
+ * @returns `local:{key}` 形式の文字列
+ */
+export function toLocalKey<K extends string>(key: K): `local:${K}` {
+  return `local:${key}`;
+}
+
+/**
+ * 生キー名に `session:` プレフィックスを付与して WXT storage API 用キーを返す
+ * @param key - `SESSION_STORAGE_KEYS` の値、またはユーザー定義のセッションキー
+ * @returns `session:{key}` 形式の文字列
+ */
+export function toSessionKey<K extends string>(key: K): `session:${K}` {
+  return `session:${key}`;
+}
 
 /**
  * コメントエントリーのキーを生成する
@@ -33,38 +52,10 @@ export function getCommentKey(topicId: string, commentNumber: string): string {
  * ストレージキーを生成する
  * @param topicId - トピック ID
  * @param commentNumber - コメント番号
- * @returns ストレージキー
- * 
- * @note WXT Storage API 仕様
- * このファイルはWXTの storage API (`storage.getItem/setItem/removeItem`) を使用しています。
- * WXTのstorage APIを使用する場合、キーには必ず以下のプレフィックスが必要です：
- * - `local:` ... browser.storage.local に相当
- * - `session:` ... browser.storage.session に相当
- * 
- * このプレフィックスはWXTフレームワークの要件であり、省略すると動作しません。
- * リファクタリングなどで browser.storage.local/session API に直接置き換える場合は、
- * プレフィックスを除去する必要があることに注意してください。
- * 
- * @example
- * ```typescript
- * // 正しい: WXT storage API用のキー
- * const key = getStorageKey('123', '456'); // => 'local:comment:123:456'
- * await storage.setItem(key, data);
- * 
- * // 誤り: プレフィックスなし（動作しない）
- * await storage.setItem('comment:123:456', data); // NG!
- * ```
+ * @returns WXT storage API 用ストレージキー（`local:comment:{topicId}:{commentNumber}` 形式）
  */
 export function getStorageKey(topicId: string, commentNumber: string): `local:${string}` {
-  return `local:${STORAGE_KEYS.COMMENT_PREFIX}${topicId}:${commentNumber}` as `local:${string}`;
-}
-
-/**
- * 指定時間待機する
- * @param ms - 待機時間（ミリ秒）
- */
-export async function sleep(ms: number): Promise<void> {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+  return toLocalKey(`${LOCAL_STORAGE_KEYS.COMMENT_PREFIX}${topicId}:${commentNumber}`);
 }
 
 /**
@@ -153,9 +144,9 @@ export async function loadAllCommentsFromStorage(): Promise<CommentEntry[]> {
 
     for (const [key, value] of Object.entries(allItems)) {
       // comment:<topicId>:<commentNumber> 形式のキーのみ処理
-      if (key.startsWith(STORAGE_KEYS.COMMENT_PREFIX)) {
+      if (key.startsWith(LOCAL_STORAGE_KEYS.COMMENT_PREFIX)) {
         try {
-          const parts = key.replace(STORAGE_KEYS.COMMENT_PREFIX, '').split(':');
+          const parts = key.replace(LOCAL_STORAGE_KEYS.COMMENT_PREFIX, '').split(':');
           if (parts.length === 2) {
             comments.push(value as CommentEntry);
           }

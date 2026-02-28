@@ -3,18 +3,26 @@
  * @description コメントの返信数を定期的に取得し、未読数を更新する
  */
 import { storage } from '#imports';
-import { parse, HTMLElement as ParsedHTMLElement } from 'node-html-parser';
 import Logger from '../utils/logger';
 import { calculatePageNumber } from '../utils/pagination';
-import { sleep } from './storage-service';
+import { sleep } from '../utils/async';
+import { parseJstDate } from '../utils/date';
 import type { CommentEntry } from '../types/comment';
 import {
+  getCommentFromCache,
+  saveComment,
+} from './comment-service';
+import { adjustUnread, computeNewUnreadCount } from './unread-service';
+import { parseResCountFromHtml } from './html-parser-service';
+import { type FetchResult, handleFetchError } from './backoff-strategy';
+import {
   SITE_CONFIG,
-  SELECTORS,
-  REGEX_PATTERNS,
   CRAWLER_CONFIG,
-  STORAGE_KEYS,
+  LOCAL_STORAGE_KEYS,
+  SESSION_STORAGE_KEYS,
+  ERROR_HANDLING_CONFIG,
 } from '../constants/app-config';
+import { toLocalKey, toSessionKey } from './storage-service';
 import { validateTopicId, validateCommentNumber, buildSafeUrl } from '../utils/validation';
 
 /**
@@ -23,27 +31,28 @@ import { validateTopicId, validateCommentNumber, buildSafeUrl } from '../utils/v
 let isCrawling = false;
 
 /**
- * 指定したコメントの返信数を取得する * @description girlschannel.netのトピックページからHTMLを取得し、
+ * 指定したコメントの返信数を取得する
+ * @description girlschannel.netのトピックページからHTMLを取得し、
  * node-html-parserを使用してDOMをパースし、返信数を抽出する。
  * ページ番号はコメント番号から動的に算出する。
- * 
+ *
  * 処理フロー:
  * 1. コメント番号からページ番号を算出
  * 2. 該当ページのHTMLをfetch
  * 3. HTMLをパースして該当コメント要素を検索
  * 4. 返信数のテキストから数値を抽出
- *  * @param topicId - トピック ID
+ * @param topicId - トピック ID
  * @param commentNumber - コメント番号
- * @returns 返信数（取得失敗時は null）
+ * @returns FetchResult（正常時は count、失敗時は status コード）
  */
 export async function fetchResCountForComment(
   topicId: string,
   commentNumber: string
-): Promise<number | null> {
+): Promise<FetchResult> {
   // 入力検証（セキュリティ対策）
   if (!validateTopicId(topicId) || !validateCommentNumber(commentNumber)) {
     Logger.error('無効な入力パラメータが検出されました', { topicId, commentNumber });
-    return null;
+    return { ok: false, errorType: 'validation' };
   }
 
   // ページ番号を動的に計算
@@ -52,9 +61,15 @@ export async function fetchResCountForComment(
   const basePath = `/topics/${topicId}/${pageNumber === '1' ? '' : `${pageNumber}/`}`;
   const url = buildSafeUrl(SITE_CONFIG.BASE_URL, basePath);
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(
+    () => controller.abort(),
+    ERROR_HANDLING_CONFIG.FETCH_TIMEOUT_MS,
+  );
+
   try {
     Logger.debug('返信数取得のため fetch を開始', { url, topicId, commentNumber, pageNumber });
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: controller.signal });
     Logger.debug('fetch レスポンス', {
       url,
       status: res.status,
@@ -62,6 +77,16 @@ export async function fetchResCountForComment(
       redirected: res.redirected,
       type: res.type,
     });
+
+    if (res.redirected) {
+      Logger.warn('リダイレクトを検出しました。トピックが削除またはURLが変更された可能性があります', {
+        originalUrl: url,
+        finalUrl: res.url,
+        topicId,
+        commentNumber,
+      });
+      return { ok: false, errorType: 'redirect', finalUrl: res.url };
+    }
 
     if (!res.ok) {
       const text = await res.text().catch((e) => `テキスト取得失敗: ${e}`);
@@ -71,7 +96,7 @@ export async function fetchResCountForComment(
         statusText: res.statusText,
         body: text,
       });
-      return null;
+      return { ok: false, errorType: 'http', status: res.status };
     }
 
     const text = await res.text();
@@ -79,62 +104,145 @@ export async function fetchResCountForComment(
 
     // node-html-parser でローカルパース
     try {
-      const root = parse(text);
-      const commentEl = root.querySelector(`#comment${commentNumber}`);
-
-      if (commentEl) {
-        // 可能性のあるセレクタを順に試す
-        const selectors = SELECTORS.RES_COUNT.split(', ');
-        let resElement: ParsedHTMLElement | null = null;
-
-        for (const selector of selectors) {
-          try {
-            resElement = commentEl.querySelector(selector);
-          } catch {
-            resElement = null;
-          }
-          if (resElement) break;
-        }
-
-        const resText = resElement ? (resElement.textContent ?? '') : '';
-
-        // コメント要素があるが返信要素が見つからない場合は返信0とみなす
-        if (!resElement) {
-          Logger.info('コメント要素に返信要素が見つかりません。返信0とします', { topicId, commentNumber });
-          return 0;
-        }
-
-        // トリムしてから厳密に "件の返信" パターンを探す
-        const trimmedText = resText.trim();
-        Logger.info('コメント要素から取得した返信テキスト', {
-          topicId,
-          commentNumber,
-          text: trimmedText.slice(0, 200),
-        });
-
-        const matchResult = trimmedText.match(REGEX_PATTERNS.RES_COUNT);
-        if (matchResult) {
-          const resCount = parseInt(matchResult[1], 10);
-          if (!Number.isNaN(resCount) && resCount >= 0) return resCount;
-        }
-      }
+      const count = parseResCountFromHtml(text, commentNumber);
+      if (count !== null) return { ok: true, count };
     } catch (e) {
       Logger.warn('node-html-parser でのパースに失敗しました', e);
       Logger.error('返信数を取得できませんでした');
-      return null;
+      return { ok: false, errorType: 'parse' };
     }
   } catch (err) {
-    let errInfo: any = { url, errType: typeof err, errString: String(err) };
-    if (err instanceof Error) {
-      errInfo.errMessage = err.message;
-      errInfo.errStack = err.stack;
-      errInfo.errName = err.name;
+    if (err instanceof Error && err.name === 'AbortError') {
+      Logger.error('fetch がタイムアウトしました', {
+        url,
+        timeoutMs: ERROR_HANDLING_CONFIG.FETCH_TIMEOUT_MS,
+      });
+    } else {
+      const errInfo: Record<string, unknown> = { url, errType: typeof err, errString: String(err) };
+      if (err instanceof Error) {
+        errInfo.errMessage = err.message;
+        errInfo.errStack = err.stack;
+        errInfo.errName = err.name;
+      }
+      Logger.error('fetch 中にエラーが発生しました', errInfo);
     }
-    Logger.error('fetch 中にエラーが発生しました', errInfo);
-    return null;
+    return { ok: false, errorType: 'network' };
+  } finally {
+    clearTimeout(timeoutId);
   }
 
-  return null;
+  // パース結果が null（コメント要素は存在するがパターン不一致）
+  return { ok: false, errorType: 'parse' };
+}
+
+/**
+ * クローラーの有効フラグを読み取る
+ * @description ストレージ読み取りに失敗した場合は fail-open で true を返す
+ * @returns クローラーが有効な場合 true
+ */
+async function checkCrawlerEnabled(): Promise<boolean> {
+  try {
+    return (await storage.getItem<boolean>(toLocalKey(LOCAL_STORAGE_KEYS.CRAWLER_ENABLED))) ?? true;
+  } catch (e) {
+    Logger.warn('クローラー: enabled フラグの読み取りに失敗しましたが処理を継続します', e);
+    return true;
+  }
+}
+
+/**
+ * 1件のコメントを処理した結果
+ * - `'updated'` : 返信数に変化があり保存した
+ * - `'skipped'` : 期限切れ・エラー等でスキップ
+ * - `'abort'`   : バックオフがセットされたためループ全体を中断すべき
+ */
+type ProcessResult = 'updated' | 'skipped' | 'abort';
+
+/**
+ * 1件のコメントの返信数を取得・比較し、変化があれば保存する
+ * @param comment - 処理対象のコメントエントリー
+ * @returns 処理結果
+ */
+async function processSingleComment(comment: CommentEntry): Promise<ProcessResult> {
+  const previousComment = getCommentFromCache(comment.topicId, comment.commentNumber) ?? comment;
+  const previousResCount = previousComment.resCount;
+  const previousUnread   = previousComment.unreadCount ?? 0;
+
+  // postedAt から SKIP_AFTER_DAYS 日以上経過したエントリーはスキップ
+  if (isCommentExpired(previousComment)) {
+    Logger.info(`クローラー: ${CRAWLER_CONFIG.SKIP_AFTER_DAYS}日以上経過したエントリーをスキップしました`, {
+      topicId: comment.topicId,
+      commentNumber: comment.commentNumber,
+    });
+    return 'skipped';
+  }
+
+  const fetchResult = await fetchResCountForComment(comment.topicId, comment.commentNumber);
+
+  if (!fetchResult.ok) {
+    const action = await handleFetchError(fetchResult, comment.topicId, comment.commentNumber);
+    return action === 'abort' ? 'abort' : 'skipped';
+  }
+
+  // 正常取得時: 500/503 連続エラーカウンターをリセット
+  try {
+      await storage.setItem(toSessionKey(SESSION_STORAGE_KEYS.CRAWLER_SERVER_ERROR_COUNT), 0);
+  } catch (e) {
+    Logger.warn('クローラー: エラーカウンターのリセットに失敗しましたが処理を継続します', e);
+  }
+
+  const currentResCount = fetchResult.count;
+  const unreadCount = computeNewUnreadCount(previousResCount, currentResCount, previousUnread);
+  const delta      = unreadCount - previousUnread;
+  const resChanged = currentResCount !== previousResCount;
+
+  if (delta === 0 && !resChanged) {
+    Logger.info('クローラー: 新着なし', {
+      topicId: comment.topicId,
+      commentNumber: comment.commentNumber,
+      resCount: currentResCount,
+    });
+    return 'skipped';
+  }
+
+  const updatedEntry: CommentEntry = {
+    ...previousComment,
+    resCount: currentResCount,
+    unreadCount,
+    updatedAt: new Date().toISOString(),
+  };
+
+  const saved = await saveComment(updatedEntry);
+  if (!saved) return 'skipped';
+
+  if (delta !== 0) {
+    await adjustUnread(delta);
+  }
+
+  Logger.info('クローラー: 更新を検出しました', {
+    topicId: comment.topicId,
+    commentNumber: comment.commentNumber,
+    previousResCount,
+    currentResCount,
+    delta,
+  });
+  return 'updated';
+}
+
+/**
+ * コメントが追跡期限切れかどうか判定する
+ * @description postedAt から SKIP_AFTER_DAYS 日以上経過していれば期限切れとみなす
+ * @param comment - 判定対象のコメントエントリー
+ * @returns 期限切れの場合 true
+ */
+function isCommentExpired(comment: CommentEntry): boolean {
+  if (!comment.postedAt) return false;
+  const parsed = parseJstDate(comment.postedAt);
+  if (!parsed) {
+    Logger.warn('isCommentExpired: postedAt のパースに失敗しました。期限切れとみなします', { postedAt: comment.postedAt });
+    return true;
+  }
+  const elapsedDays = (Date.now() - parsed.getTime()) / (1000 * 60 * 60 * 24);
+  return elapsedDays >= CRAWLER_CONFIG.SKIP_AFTER_DAYS;
 }
 
 /**
@@ -151,16 +259,10 @@ export async function fetchResCountForComment(
  * 5. 未読合計を調整
  * 
  * @param commentList - クロール対象のコメントリスト
- * @param getComment - コメントを取得する関数
- * @param saveComment - コメントを保存する関数
- * @param adjustUnread - 未読数を調整する関数
  * @returns 更新されたコメント数
  */
 export async function crawlCommentsOnce(
-  commentList: CommentEntry[],
-  getComment: (topicId: string, commentNumber: string) => CommentEntry | undefined,
-  saveComment: (entry: CommentEntry) => Promise<CommentEntry | null>,
-  adjustUnread: (delta: number) => Promise<void>
+  commentList: CommentEntry[]
 ): Promise<number> {
   if (isCrawling) {
     Logger.info('クローラー: 既に実行中です');
@@ -175,106 +277,49 @@ export async function crawlCommentsOnce(
       return 0;
     }
 
+    // バックオフ中は全エントリーをスキップ
+    try {
+      const backoffUntil = (await storage.getItem<number>(toSessionKey(SESSION_STORAGE_KEYS.CRAWLER_BACKOFF_UNTIL))) ?? 0;
+      if (Date.now() < backoffUntil) {
+        const remainingMin = Math.ceil((backoffUntil - Date.now()) / 60_000);
+        Logger.info('クローラー: バックオフ中のためスキップします', { remainingMin });
+        return 0;
+      }
+    } catch (e) {
+      Logger.warn('クローラー: バックオフ状態の読み取りに失敗しましたが処理を継続します', e);
+    }
+
     Logger.info('クローラー: コメントのチェックを開始します', { count: commentList.length });
     let updatedCount = 0;
+    let shouldAbort  = false;
 
     for (const comment of commentList) {
-      // 各エントリー処理前に最新の有効フラグを確認
-      try {
-        const enabledNow = (await storage.getItem<boolean>(STORAGE_KEYS.CRAWLER_ENABLED)) ?? true;
-        if (!enabledNow) {
-          Logger.info('クローラー: 停止フラグが立っているため途中終了します');
-          break;
-        }
-      } catch (e) {
-        Logger.warn('クローラー: enabled フラグの読み取りに失敗しましたが処理を継続します', e);
+      if (shouldAbort) break;
+
+      // ループ先頭で有効フラグを確認
+      if (!await checkCrawlerEnabled()) {
+        Logger.info('クローラー: 停止フラグが立っているため途中終了します');
+        break;
       }
 
       try {
-        const previousComment = getComment(comment.topicId, comment.commentNumber) ?? comment;
-        const previousResCount = previousComment.resCount;
-        const previousUnread = previousComment.unreadCount;
-
-        // postedAt から31日以上経過したエントリーはスキップ
-        if (previousComment.postedAt) {
-          const postedDate = new Date(previousComment.postedAt).getTime();
-          const currentTime = new Date().getTime();
-          const elapsedDays = (currentTime - postedDate) / (1000 * 60 * 60 * 24);
-
-          if (elapsedDays >= CRAWLER_CONFIG.SKIP_AFTER_DAYS) {
-            Logger.info(`クローラー: ${CRAWLER_CONFIG.SKIP_AFTER_DAYS}日以上経過したエントリーをスキップしました`, {
-              topicId: comment.topicId,
-              commentNumber: comment.commentNumber,
-              elapsedDays: Math.floor(elapsedDays),
-            });
-            continue;
-          }
-        }
-
-        const currentResCount = await fetchResCountForComment(comment.topicId, comment.commentNumber);
-
-        if (currentResCount === null) {
-          Logger.warn('クローラー: コメントが見つかりませんでした', {
-            topicId: comment.topicId,
-            commentNumber: comment.commentNumber,
-          });
-          continue;
-        }
-
-        let unreadCount = previousResCount == null ? 0 : currentResCount - previousResCount + (previousUnread ?? 0);
-        if (typeof unreadCount === 'number') unreadCount = Math.max(0, unreadCount);
-
-        // 未読数または返信数に変化があった場合のみ保存
-        const delta = unreadCount - previousUnread;
-        const resChanged = currentResCount !== previousResCount;
-
-        if (delta !== 0 || resChanged) {
-          const updatedEntry: CommentEntry = {
-            ...previousComment,
-            resCount: currentResCount,
-            unreadCount: unreadCount,
-            updatedAt: new Date().toISOString(),
-          };
-
-          // 保存
-          const saved = await saveComment(updatedEntry);
-          if (saved) {
-            // 未読差分を調整
-            if (delta !== 0) {
-              await adjustUnread(delta);
-            }
-            updatedCount++;
-            Logger.info('クローラー: 更新を検出しました', {
-              topicId: comment.topicId,
-              commentNumber: comment.commentNumber,
-              previousResCount,
-              currentResCount,
-              delta,
-            });
-          }
-        } else {
-          Logger.info('クローラー: 新着なし', {
-            topicId: comment.topicId,
-            commentNumber: comment.commentNumber,
-            resCount: currentResCount,
-          });
+        const result = await processSingleComment(comment);
+        if (result === 'abort') {
+          shouldAbort = true;
+        } else if (result === 'updated') {
+          updatedCount++;
         }
       } catch (err) {
         Logger.error('クローラー: 更新に失敗しました', err);
       } finally {
-        // サーバー負荷軽減のため各ループ後に3秒待機
+        // サーバー負荷軽減のため各ループ後に待機
         try {
           await sleep(CRAWLER_CONFIG.ACTIVE_DELAY_MS);
 
-          // 待機後にもフラグを再確認して停止を反映
-          try {
-            const enabledAfter = (await storage.getItem<boolean>(STORAGE_KEYS.CRAWLER_ENABLED)) ?? true;
-            if (!enabledAfter) {
-              Logger.info('クローラー: 待機後に停止フラグが検出されたためループを抜けます');
-              break;
-            }
-          } catch (e) {
-            Logger.warn('クローラー: 待機後の enabled 読み取りに失敗しましたが処理を継続します', e);
+          // 待機後にも停止フラグを再確認
+          if (!await checkCrawlerEnabled()) {
+            Logger.info('クローラー: 待機後に停止フラグが検出されたためループを抜けます');
+            shouldAbort = true;
           }
         } catch {
           // ignore

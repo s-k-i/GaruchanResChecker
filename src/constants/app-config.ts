@@ -26,28 +26,33 @@ export const PAGINATION = {
 } as const;
 
 /**
- * ストレージキー
- * 
- * @important WXT Storage API 仕様について
- * UNREAD_TOTAL, CRAWLER_ENABLED, TRACK_BUTTON_VISIBLE などの`local:`プレフィックス付きキーは、
- * WXT の storage API (storage.getItem/setItem) で使用するための形式です。
- * 
- * SESSION_PREFIX と COMMENT_PREFIX は、実際のキー生成時に `local:` や `session:` を
- * 先頭に付加する必要があります（例: `local:comment:123:456`）。
- * 
- * このプレフィックスはWXTフレームワークの要件であり、省略できません。
+ * ローカルストレージキー（生キー名）
+ *
+ * @description WXT storage API 呼び出し時は `toLocalKey()` で `local:` プレフィックスを付加する。
+ * 例: `toLocalKey(LOCAL_STORAGE_KEYS.UNREAD_TOTAL)` → `'local:unreadTotal'`
  */
-export const STORAGE_KEYS = {
-  /** コメントプレフィックス（使用時は `local:comment:` となる） */
+export const LOCAL_STORAGE_KEYS = {
+  /** コメントプレフィックス（`toLocalKey` と組み合わせて `local:comment:` となる） */
   COMMENT_PREFIX: 'comment:',
   /** 未読合計 */
-  UNREAD_TOTAL: 'local:unreadTotal',
+  UNREAD_TOTAL: 'unreadTotal',
   /** クローラー有効化 */
-  CRAWLER_ENABLED: 'local:crawler:enabled',
+  CRAWLER_ENABLED: 'crawler:enabled',
   /** 追跡ボタン表示 */
-  TRACK_BUTTON_VISIBLE: 'local:track-button:visible',
-  /** セッションプレフィックス（使用時は `session:` となる） */
-  SESSION_PREFIX: 'session:',
+  TRACK_BUTTON_VISIBLE: 'track-button:visible',
+} as const;
+
+/**
+ * セッションストレージキー（生キー名）
+ *
+ * @description WXT storage API 呼び出し時は `toSessionKey()` で `session:` プレフィックスを付加する。
+ * 例: `toSessionKey(SESSION_STORAGE_KEYS.CRAWLER_BACKOFF_UNTIL)` → `'session:crawler:backoffUntil'`
+ */
+export const SESSION_STORAGE_KEYS = {
+  /** クローラーバックオフ解除時刻（Unixミリ秒） */
+  CRAWLER_BACKOFF_UNTIL: 'crawler:backoffUntil',
+  /** 500/503の連続エラー回数 */
+  CRAWLER_SERVER_ERROR_COUNT: 'crawler:serverErrorCount',
 } as const;
 
 /**
@@ -163,6 +168,20 @@ export const REGEX_PATTERNS = {
 } as const;
 
 /**
+ * HTTPエラーハンドリング設定
+ */
+export const ERROR_HANDLING_CONFIG = {
+  /** 403検出時のバックオフ時間（ms）: 1時間 */
+  FORBIDDEN_BACKOFF_MS: 60 * 60 * 1000,
+  /** 500/503の1回目バックオフ基準時間（ms）: 5分 */
+  SERVER_ERROR_BASE_DELAY_MS: 5 * 60 * 1000,
+  /** 500/503バックオフの上限（ms）: 1時間 */
+  SERVER_ERROR_MAX_DELAY_MS: 60 * 60 * 1000,
+  /** fetch のタイムアウト時間（ms）: 15秒 */
+  FETCH_TIMEOUT_MS: 15_000,
+} as const;
+
+/**
  * 楽観ロック設定
  */
 export const OPTIMISTIC_LOCK = {
@@ -200,6 +219,8 @@ export const MESSAGE_TYPES = {
   TRACK_FROM_CONTEXT_MENU: 'track-from-context-menu',
   /** 追跡ボタン表示状態変更通知（background → content script ブロードキャスト） */
   TRACK_BUTTON_VISIBILITY_CHANGED: 'track-button-visibility-changed',
+  /** 追跡ボタン表示状態設定リクエスト（popup/content → background） */
+  SET_TRACK_BUTTON_VISIBLE: 'set-track-button-visible',
 } as const;
 
 /**

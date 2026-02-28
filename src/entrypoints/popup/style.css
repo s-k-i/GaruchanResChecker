@@ -28,23 +28,6 @@
   border-color: #e57373;
 }
 
-/* トピック全削除ボタン専用スタイル */
-.topic-delete-all-btn {
-  background: #fff0f0;
-  color: #d32f2f;
-  border: 1px solid #f8bbbc;
-  border-radius: 6px;
-  font-size: 0.85em;
-  padding: 0.25em 0.7em;
-  margin-left: auto;
-  transition: background 0.2s, color 0.2s;
-}
-.topic-delete-all-btn:hover {
-  background: #ffeaea;
-  color: #b71c1c;
-  border-color: #e57373;
-}
-
 /* --- UI改善: popup全体 --- */
 :root {
   font-weight: 400;

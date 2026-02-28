@@ -8,6 +8,7 @@ import type { CommentEntry } from '../types/comment';
 import { COMMENT_ENTRY_CONFIG } from '../constants/app-config';
 import {
   getCommentKey,
+  getStorageKey,
   saveCommentWithOptimisticLock,
   loadAllCommentsFromStorage,
   deleteCommentFromStorage,
@@ -71,7 +72,7 @@ export async function saveComment(entry: CommentEntry): Promise<CommentEntry | n
   }
 
   // キャッシュを更新（バージョン更新後の値を取得）
-  const storageKey = `local:comment:${entry.topicId}:${entry.commentNumber}` as `local:${string}`;
+  const storageKey = getStorageKey(entry.topicId, entry.commentNumber);
   const updatedEntry = await storage.getItem<CommentEntry>(storageKey);
   if (updatedEntry) {
     commentCache.set(key, updatedEntry);

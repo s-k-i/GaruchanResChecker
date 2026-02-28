@@ -29,10 +29,10 @@ function filterSensitiveData(data: unknown): unknown {
 // 本番環境:
 //   debug/info/warnは出力しない
 //   errorはフィルタして出力する（呼び出し元情報は消失するが、セキュリティ優先）
-export const debug = IS_PRODUCTION ? (() => { }) : console.log.bind(console, PREFIX);
-export const info = IS_PRODUCTION ? (() => { }) : console.info.bind(console, PREFIX);
-export const warn = IS_PRODUCTION ? (() => { }) : console.warn.bind(console, PREFIX);
-export const error = IS_PRODUCTION
+const debug = IS_PRODUCTION ? (() => { }) : console.log.bind(console, PREFIX);
+const info = IS_PRODUCTION ? (() => { }) : console.info.bind(console, PREFIX);
+const warn = IS_PRODUCTION ? (() => { }) : console.warn.bind(console, PREFIX);
+const error = IS_PRODUCTION
   ? (...args: unknown[]) => {
     const filtered = args.map((arg) => filterSensitiveData(arg));
     console.error(PREFIX, ...filtered);

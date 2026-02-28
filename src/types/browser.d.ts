@@ -38,23 +38,23 @@ export interface ChangeInfo {
   /** 変更後のURL */
   url?: string;
   /** 読み込み状態 */
-  status?: 'loading' | 'complete';
+  status?: 'loading' | 'complete' | 'unloaded';
 }
 
 /**
- * ストレージ変更の型定義
- * @description browser.storage.onChangedイベントで渡される変更情報
- * @template T - ストレージに保存される値の型
+ * コンテキストメニュークリック情報の型定義
+ * @description browser.contextMenus.onClicked イベントで渡される情報
  */
-export interface StorageChange<T = unknown> {
-  /** 変更前の値 */
-  oldValue?: T;
-  /** 変更後の値 */
-  newValue?: T;
+export interface ContextMenuClickInfo {
+  /** クリックされたメニューアイテムID */
+  menuItemId: string | number;
 }
 
 /**
- * ストレージエリアの型定義
- * @description browser.storage APIで使用可能なストレージ領域
+ * browser.runtime の型拡張
+ * @description WXT が提供する型に不足している getURL を補完する
  */
-export type StorageArea = 'local' | 'sync' | 'session';
+export interface BrowserRuntime {
+  /** 拡張機能内リソースの完全 URL を返す */
+  getURL(path: string): string;
+}

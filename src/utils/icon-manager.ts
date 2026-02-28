@@ -6,9 +6,17 @@ import Logger from './logger';
 import { SITE_CONFIG } from '../constants/app-config';
 
 /**
+ * マニフェストのアイコン関連フィールドの型
+ */
+interface ManifestWithIcons {
+  icons: Record<string, string>;
+  action: { default_icon: Record<string, string> };
+}
+
+/**
  * マニフェストからアイコンパスを読み取る
  */
-const manifest = browser.runtime.getManifest() as any;
+const manifest = browser.runtime.getManifest() as unknown as ManifestWithIcons;
 const ICONS = {
   pink: manifest.icons,
   grey: manifest.action.default_icon,

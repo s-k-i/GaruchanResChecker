@@ -13,6 +13,7 @@ import {
 } from '../constants/app-config';
 import { validateTopicId, validateCommentNumber, validateTextLength } from './validation';
 import type { GetTrackButtonVisibleResponse, UpsertCommentResponse } from '../types/messages';
+import type { BrowserRuntime } from '../types/browser.d';
 
 /**
  * コメント本文を抽出する（画像・引用を置換）
@@ -221,7 +222,7 @@ export async function addTrackingButtons(
 
     // ハートアイコンを追加
     const icon = document.createElement('img');
-    icon.src = (browser.runtime as any).getURL(ICONS.PINK_HEART_SVG);
+    icon.src = (browser.runtime as BrowserRuntime).getURL(ICONS.PINK_HEART_SVG);
     icon.className = CLASS_NAMES.TRACK_ICON;
 
     btn.appendChild(icon);

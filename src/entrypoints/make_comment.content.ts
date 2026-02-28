@@ -9,6 +9,8 @@
  */
 import Logger from '../utils/logger';
 import { sendMessageSafely } from '../utils/error-handler';
+import { getTopicId } from '../utils/topic-extractor';
+import { formatJstDate } from '../utils/date';
 import {
   REGEX_PATTERNS,
   URL_PATTERNS,
@@ -17,22 +19,6 @@ import {
   TEXT_REPLACEMENTS,
 } from '../constants/app-config';
 import type { GetSessionResponse, SetSessionResponse, UpsertCommentResponse } from '../types/messages';
-
-/**
- * トピック ID を取得する
- * @returns トピック ID、または null
- */
-function getTopicId(): string | null {
-  // body の属性から取得する
-  const attr = document.body.getAttribute('topicId');
-  if (attr) return attr.trim();
-
-  // URLから取得するフォールバック
-  const pattern = new RegExp(`${URL_PATTERNS.MAKE_COMMENT}(\\d+)(?:\\/|$)`);
-  const m = location.pathname.match(pattern);
-  if (m) return m[1];
-  return null;
-}
 
 /**
  * コメント投稿内容の確認ページからコメント本文を取得する
@@ -72,41 +58,13 @@ function parseTopicsHref(href: string) {
   return null;
 }
 
-/**
- * Date を日本時間（JST）で指定フォーマットに変換する
- * 例: "2026/01/19(月) 18:52:17"
- * @param {Date} [date]
- * @returns {string}
- */
-function formatJstDate(date: Date = new Date()): string {
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-    weekday: 'short'
-  }).formatToParts(date);
-
-  const map: Record<string, string> = {};
-  for (const p of parts) {
-    map[p.type] = p.value;
-  }
-
-  // map.weekday は "月" のような単一文字
-  return `${map.year}/${map.month}/${map.day}(${map.weekday}) ${map.hour}:${map.minute}:${map.second}`;
-}
-
 export default defineContentScript({
   matches: ['https://girlschannel.net/make_comment/*'],
   async main() {
     Logger.info('コメント投稿ページを検出しました。');
 
     try {
-      const topicId = getTopicId();
+      const topicId = getTopicId(URL_PATTERNS.MAKE_COMMENT);
       if (!topicId) {
         Logger.error('このページにトピックIDが見つかりませんでした', { href: location.href });
         return;

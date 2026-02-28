@@ -5,41 +5,42 @@
 import { storage } from '#imports';
 import Logger from '../utils/logger';
 import type { CommentEntry } from '../types/comment';
-import type { MessageRequest, MessageResponse } from '../types/messages';
+import type {
+  MessageRequest,
+  MessageResponse,
+  UpsertCommentRequest,
+  RemoveCommentRequest,
+  RemoveTopicRequest,
+  ClearUnreadRequest,
+  SetCrawlerEnabledRequest,
+  SetTrackButtonVisibleRequest,
+  SetSessionRequest,
+  GetSessionRequest,
+} from '../types/messages';
 import {
   getAllCommentsFromCache,
   getCommentFromCache,
   saveComment,
   deleteComment,
-} from '../services/comment-service';
+} from './comment-service';
 import {
   crawlCommentsOnce,
   fetchResCountForComment,
-} from '../services/crawler-service';
-import { STORAGE_KEYS } from '../constants/app-config';
+} from './crawler-service';
+import { adjustUnread } from './unread-service';
+import { LOCAL_STORAGE_KEYS, SESSION_STORAGE_KEYS } from '../constants/app-config';
+import { toLocalKey, toSessionKey } from './storage-service';
 import {
   validateTopicId,
   validateCommentNumber,
 } from '../utils/validation';
 
 /**
- * メッセージハンドラーの依存関数
- */
-interface HandlerDependencies {
-  adjustUnread: (delta: number) => Promise<void>;
-}
-
-/**
  * クローラー即時実行ハンドラー
  */
-async function handleCrawlNow(deps: HandlerDependencies): Promise<MessageResponse> {
+async function handleCrawlNow(): Promise<MessageResponse> {
   const commentList = getAllCommentsFromCache();
-  const updatedCount = await crawlCommentsOnce(
-    commentList,
-    getCommentFromCache,
-    saveComment,
-    deps.adjustUnread
-  );
+  const updatedCount = await crawlCommentsOnce(commentList);
   return { ok: true, started: updatedCount > 0 };
 }
 
@@ -47,9 +48,9 @@ async function handleCrawlNow(deps: HandlerDependencies): Promise<MessageRespons
  * コメント追加・更新ハンドラー
  */
 async function handleUpsertComment(
-  entry: CommentEntry,
-  deps: HandlerDependencies
+  message: UpsertCommentRequest
 ): Promise<MessageResponse> {
+  const { entry } = message;
   // 入力検証
   if (!validateTopicId(entry.topicId)) {
     return { ok: false, error: '無効なトピックIDです' };
@@ -68,12 +69,12 @@ async function handleUpsertComment(
 
   // 新規追加の場合は未読数を加算
   if (!existing) {
-    await deps.adjustUnread(Number(toSave.unreadCount) || 0);
+    await adjustUnread(Number(toSave.unreadCount) || 0);
   } else {
     // 既存の場合は差分を計算
     const prevUnread = Number(existing.unreadCount) || 0;
     const newUnread = Number(toSave.unreadCount) || 0;
-    await deps.adjustUnread(newUnread - prevUnread);
+    await adjustUnread(newUnread - prevUnread);
   }
 
   // 保存
@@ -85,10 +86,9 @@ async function handleUpsertComment(
  * コメント削除ハンドラー
  */
 async function handleRemoveComment(
-  topicId: string,
-  commentNumber: string,
-  deps: HandlerDependencies
+  message: RemoveCommentRequest
 ): Promise<MessageResponse> {
+  const { topicId, commentNumber } = message;
   // 入力検証
   if (!validateTopicId(topicId)) {
     return { ok: false, error: '無効なトピックIDです' };
@@ -102,7 +102,7 @@ async function handleRemoveComment(
     // 削除時は未読分を差し引く
     const prevUnread = Number(existing.unreadCount) || 0;
     if (prevUnread > 0) {
-      await deps.adjustUnread(-prevUnread);
+      await adjustUnread(-prevUnread);
     }
   }
 
@@ -114,9 +114,9 @@ async function handleRemoveComment(
  * トピック削除ハンドラー
  */
 async function handleRemoveTopic(
-  topicId: string,
-  deps: HandlerDependencies
+  message: RemoveTopicRequest
 ): Promise<MessageResponse> {
+  const { topicId } = message;
   // 入力検証
   if (!validateTopicId(topicId)) {
     return { ok: false, error: '無効なトピックIDです' };
@@ -139,7 +139,7 @@ async function handleRemoveTopic(
 
   // 未読数を差し引く
   if (totalUnread > 0) {
-    await deps.adjustUnread(-totalUnread);
+    await adjustUnread(-totalUnread);
   }
 
   Logger.info('トピックを削除しました', {
@@ -154,10 +154,9 @@ async function handleRemoveTopic(
  * 未読クリアハンドラー
  */
 async function handleClearUnread(
-  topicId: string,
-  commentNumber: string,
-  deps: HandlerDependencies
+  message: ClearUnreadRequest
 ): Promise<MessageResponse> {
+  const { topicId, commentNumber } = message;
   // 入力検証
   if (!validateTopicId(topicId)) {
     return { ok: false, error: '無効なトピックIDです' };
@@ -172,7 +171,7 @@ async function handleClearUnread(
   }
 
   // 最新の返信数を取得して prev を合わせることで、直後のクローラで未読が復活するのを防ぐ
-  const nowResCount = await fetchResCountForComment(topicId, commentNumber);
+  const fetchResult = await fetchResCountForComment(topicId, commentNumber);
   const now = new Date().toISOString();
 
   const prevUnread = Number(existing.unreadCount) || 0;
@@ -182,13 +181,13 @@ async function handleClearUnread(
     updatedAt: now,
   };
 
-  if (typeof nowResCount === 'number') {
-    updatedEntry.resCount = nowResCount;
+  if (fetchResult.ok) {
+    updatedEntry.resCount = fetchResult.count;
   }
 
   // 未読数を差し引く
   if (prevUnread > 0) {
-    await deps.adjustUnread(-prevUnread);
+    await adjustUnread(-prevUnread);
   }
 
   // 保存
@@ -208,8 +207,9 @@ async function handleGetAllComments(): Promise<MessageResponse> {
 /**
  * クローラー有効化設定ハンドラー
  */
-async function handleSetCrawlerEnabled(enabled: boolean): Promise<MessageResponse> {
-  await storage.setItem(STORAGE_KEYS.CRAWLER_ENABLED, enabled);
+async function handleSetCrawlerEnabled(message: SetCrawlerEnabledRequest): Promise<MessageResponse> {
+  const { enabled } = message;
+  await storage.setItem(toLocalKey(LOCAL_STORAGE_KEYS.CRAWLER_ENABLED), enabled);
   Logger.info('クローラー有効化状態を設定しました', { enabled });
   return { ok: true };
 }
@@ -218,15 +218,16 @@ async function handleSetCrawlerEnabled(enabled: boolean): Promise<MessageRespons
  * クローラー有効化取得ハンドラー
  */
 async function handleGetCrawlerEnabled(): Promise<MessageResponse> {
-  const enabled = (await storage.getItem<boolean>(STORAGE_KEYS.CRAWLER_ENABLED)) ?? true;
+  const enabled = (await storage.getItem<boolean>(toLocalKey(LOCAL_STORAGE_KEYS.CRAWLER_ENABLED))) ?? true;
   return { ok: true, enabled };
 }
 
 /**
  * 追跡ボタン表示設定ハンドラー
  */
-async function handleSetTrackButtonVisible(visible: boolean): Promise<MessageResponse> {
-  await storage.setItem(STORAGE_KEYS.TRACK_BUTTON_VISIBLE, visible);
+async function handleSetTrackButtonVisible(message: SetTrackButtonVisibleRequest): Promise<MessageResponse> {
+  const { visible } = message;
+  await storage.setItem(toLocalKey(LOCAL_STORAGE_KEYS.TRACK_BUTTON_VISIBLE), visible);
   Logger.info('追跡ボタン表示状態を設定しました', { visible });
   return { ok: true };
 }
@@ -235,16 +236,16 @@ async function handleSetTrackButtonVisible(visible: boolean): Promise<MessageRes
  * 追跡ボタン表示取得ハンドラー
  */
 async function handleGetTrackButtonVisible(): Promise<MessageResponse> {
-  const visible = (await storage.getItem<boolean>(STORAGE_KEYS.TRACK_BUTTON_VISIBLE)) ?? false;
+  const visible = (await storage.getItem<boolean>(toLocalKey(LOCAL_STORAGE_KEYS.TRACK_BUTTON_VISIBLE))) ?? false;
   return { ok: true, visible };
 }
 
 /**
  * セッション設定ハンドラー
  */
-async function handleSetSession(key: string, value: unknown): Promise<MessageResponse> {
-  const sessionKey = `${STORAGE_KEYS.SESSION_PREFIX}${key}` as `session:${string}`;
-  await storage.setItem(sessionKey, value);
+async function handleSetSession(message: SetSessionRequest): Promise<MessageResponse> {
+  const { key, value } = message;
+  await storage.setItem(toSessionKey(key), value);
   Logger.info('セッションストレージに設定しました', { key });
   return { ok: true };
 }
@@ -252,9 +253,9 @@ async function handleSetSession(key: string, value: unknown): Promise<MessageRes
 /**
  * セッション取得ハンドラー
  */
-async function handleGetSession(key: string): Promise<MessageResponse> {
-  const sessionKey = `${STORAGE_KEYS.SESSION_PREFIX}${key}` as `session:${string}`;
-  const value = await storage.getItem(sessionKey);
+async function handleGetSession(message: GetSessionRequest): Promise<MessageResponse> {
+  const { key } = message;
+  const value = await storage.getItem(toSessionKey(key));
   return { ok: true, value };
 }
 
@@ -262,74 +263,45 @@ async function handleGetSession(key: string): Promise<MessageResponse> {
  * メッセージをルーティングして適切なハンドラーに振り分ける
  */
 export async function routeMessage(
-  message: MessageRequest,
-  deps: HandlerDependencies
+  message: MessageRequest
 ): Promise<MessageResponse> {
   try {
     switch (message.type) {
       case 'crawl-now':
-        return await handleCrawlNow(deps);
+        return await handleCrawlNow();
 
       case 'upsert-comment':
-        if (!message.entry) {
-          return { ok: false, error: 'エントリーが指定されていません' };
-        }
-        return await handleUpsertComment(message.entry, deps);
+        return await handleUpsertComment(message);
 
       case 'remove-comment':
-        if (!message.topicId || !message.commentNumber) {
-          return { ok: false, error: 'topicIdまたはcommentNumberが指定されていません' };
-        }
-        return await handleRemoveComment(message.topicId, message.commentNumber, deps);
+        return await handleRemoveComment(message);
 
       case 'remove-topic':
-        if (!message.topicId) {
-          return { ok: false, error: 'topicIdが指定されていません' };
-        }
-        return await handleRemoveTopic(message.topicId, deps);
+        return await handleRemoveTopic(message);
 
       case 'clear-unread':
-        if (!message.topicId || !message.commentNumber) {
-          return { ok: false, error: 'topicIdまたはcommentNumberが指定されていません' };
-        }
-        return await handleClearUnread(message.topicId, message.commentNumber, deps);
+        return await handleClearUnread(message);
 
       case 'get-all-comments':
         return await handleGetAllComments();
 
       case 'set-crawler-enabled':
-        if (typeof message.enabled !== 'boolean') {
-          return { ok: false, error: 'enabledがboolean型ではありません' };
-        }
-        return await handleSetCrawlerEnabled(message.enabled);
+        return await handleSetCrawlerEnabled(message);
 
       case 'get-crawler-enabled':
         return await handleGetCrawlerEnabled();
 
       case 'set-track-button-visible':
-        if (typeof message.visible !== 'boolean') {
-          return { ok: false, error: 'visibleがboolean型ではありません' };
-        }
-        return await handleSetTrackButtonVisible(message.visible);
+        return await handleSetTrackButtonVisible(message);
 
       case 'get-track-button-visible':
         return await handleGetTrackButtonVisible();
 
       case 'set-session':
-        if (!message.key) {
-          return { ok: false, error: 'keyが指定されていません' };
-        }
-        return await handleSetSession(message.key, message.value);
+        return await handleSetSession(message);
 
       case 'get-session':
-        if (!message.key) {
-          return { ok: false, error: 'keyが指定されていません' };
-        }
-        return await handleGetSession(message.key);
-
-      case 'track-from-context-menu':
-        // この処理はbackground.tsで直接実装されるため、ここでは何もしない
-        return { ok: true };
+        return await handleGetSession(message);
 
       default:
         Logger.warn('未知のメッセージタイプを受信しました', { type: message.type });
