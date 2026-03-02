@@ -133,6 +133,29 @@ export interface GetTrackButtonVisibleResponse extends BaseResponse {
 }
 
 /**
+ * 投稿コメントの自動追跡設定リクエスト
+ * @description 投稿完了時に自動的にコメントを追跡リストに追加するかどうかを切り替える
+ */
+export interface SetAutoTrackPostRequest extends BaseMessage {
+  type: 'set-auto-track-post';
+  enabled: boolean;
+}
+
+export interface SetAutoTrackPostResponse extends BaseResponse {}
+
+/**
+ * 投稿コメントの自動追跡取得リクエスト
+ * @description 現在の自動追跡設定を取得する
+ */
+export interface GetAutoTrackPostRequest extends BaseMessage {
+  type: 'get-auto-track-post';
+}
+
+export interface GetAutoTrackPostResponse extends BaseResponse {
+  enabled: boolean;
+}
+
+/**
  * セッション設定リクエスト
  * @description browser.storage.sessionに一時的なデータを保存する
  */
@@ -200,6 +223,8 @@ export type MessageRequest =
   | GetCrawlerEnabledRequest
   | SetTrackButtonVisibleRequest
   | GetTrackButtonVisibleRequest
+  | SetAutoTrackPostRequest
+  | GetAutoTrackPostRequest
   | SetSessionRequest
   | GetSessionRequest
   | TrackFromContextMenuRequest
@@ -221,6 +246,8 @@ export type MessageResponse =
   | GetCrawlerEnabledResponse
   | SetTrackButtonVisibleResponse
   | GetTrackButtonVisibleResponse
+  | SetAutoTrackPostResponse
+  | GetAutoTrackPostResponse
   | SetSessionResponse
   | GetSessionResponse
   | TrackFromContextMenuResponse;

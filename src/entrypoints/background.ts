@@ -34,6 +34,7 @@ import {
   CONTEXT_MENU_CONFIG,
   SITE_CONFIG,
   URL_PATTERNS,
+  SETTING_DEFAULTS,
 } from '../constants/app-config';
 import { toLocalKey } from '../services/storage-service';
 import { recomputeBadge, setOnUnreadChanged } from '../services/unread-service';
@@ -166,12 +167,19 @@ export default defineBackground(() => {
 
   async function initializeCrawlerAlarm(): Promise<void> {
     try {
-      // 初回デフォルト: クローラーフラグ有効化フラグが未設定なら有効化しておく
-      const saved = await storage.getItem<boolean>(toLocalKey(LOCAL_STORAGE_KEYS.CRAWLER_ENABLED));
-      if (saved === undefined || saved === null) {
-        await storage.setItem(toLocalKey(LOCAL_STORAGE_KEYS.CRAWLER_ENABLED), true);
-        Logger.info('クローラーを有効化しました（デフォルト設定）');
+      // 初回デフォルト: 未設定の場合は SETTING_DEFAULTS の値で初期化する
+      const settingEntries: Array<[`local:${string}`, boolean]> = [
+        [toLocalKey(LOCAL_STORAGE_KEYS.CRAWLER_ENABLED), SETTING_DEFAULTS.CRAWLER_ENABLED],
+        [toLocalKey(LOCAL_STORAGE_KEYS.TRACK_BUTTON_VISIBLE), SETTING_DEFAULTS.TRACK_BUTTON_VISIBLE],
+        [toLocalKey(LOCAL_STORAGE_KEYS.AUTO_TRACK_POST_ENABLED), SETTING_DEFAULTS.AUTO_TRACK_POST_ENABLED],
+      ];
+      for (const [key, defaultValue] of settingEntries) {
+        const saved = await storage.getItem<boolean>(key);
+        if (saved === undefined || saved === null) {
+          await storage.setItem(key, defaultValue);
+        }
       }
+      Logger.info('設定のデフォルト値を初期化しました', SETTING_DEFAULTS);
 
       // 既存アラームがなければ新規登録（SW 再起動毎に重複登録されるのを防ぐ）
       const existing = await browser.alarms.get(CRAWLER_CONFIG.ALARM_NAME);

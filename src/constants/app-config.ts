@@ -36,10 +36,24 @@ export const LOCAL_STORAGE_KEYS = {
   COMMENT_PREFIX: 'comment:',
   /** 未読合計 */
   UNREAD_TOTAL: 'unreadTotal',
-  /** クローラー有効化 */
+  /** クローラー（返信通知）有効化 */
   CRAWLER_ENABLED: 'crawler:enabled',
   /** 追跡ボタン表示 */
   TRACK_BUTTON_VISIBLE: 'track-button:visible',
+  /** 投稿コメントの自動追跡 */
+  AUTO_TRACK_POST_ENABLED: 'auto-track-post:enabled',
+} as const;
+
+/**
+ * オプション設定のデフォルト値（初回インストール時などのストレージ未設定時に適用）
+ */
+export const SETTING_DEFAULTS = {
+  /** クローラー（返信通知）有効化 */
+  CRAWLER_ENABLED: true,
+  /** 追跡ボタン表示 */
+  TRACK_BUTTON_VISIBLE: false,
+  /** 投稿コメントの自動追跡 */
+  AUTO_TRACK_POST_ENABLED: true,
 } as const;
 
 /**

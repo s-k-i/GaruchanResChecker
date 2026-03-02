@@ -81,89 +81,25 @@ h1 {
   text-shadow: 0 1px 1px rgba(0,0,0,0.12);
 }
 
-/* 監視スイッチ */
-.crawler-toggle-container {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-.crawler-label {
-  font-weight: 600;
-  color: #213547;
-  font-size: 0.95rem;
-}
-
-/* 追跡ボタン表示スイッチ */
-.track-button-toggle-container {
+/* 設定ボタン（歯車アイコン） */
+button.settings-btn {
   margin-left: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.2rem;
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background 0.2s;
 }
-.track-button-label {
-  font-weight: 600;
-  color: #213547;
-  font-size: 0.95rem;
+button.settings-btn:hover {
+  background: rgba(255,255,255,0.2);
 }
-.track-button-status {
-  font-size: 0.85rem;
-  color: #666;
-  min-width: 3em;
-  text-align: center;
-}
-
-/* スライドスイッチ */
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 44px;
-  height: 24px;
-}
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-  position: absolute;
-}
-.slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #ccc;
-  transition: 0.2s;
-  border-radius: 999px;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
-}
-.slider::before {
-  content: "";
-  position: absolute;
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  top: 3px;
-  background-color: white;
-  transition: 0.2s;
-  border-radius: 50%;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
-}
-.switch input:checked + .slider {
-  background-color: #4ade80; /* 緑 */
-}
-.switch input:focus + .slider {
-  box-shadow: 0 0 0 3px rgba(100, 116, 255, 0.16);
-}
-.switch input:checked + .slider::before {
-  transform: translateX(20px);
-}
-
-.crawler-status {
-  font-size: 0.85rem;
-  color: #666;
-  min-width: 2.2em;
-  text-align: center;
+button.settings-btn:focus {
+  outline: 2px solid rgba(255,255,255,0.5);
+  outline-offset: 2px;
 }
 
 .logo {

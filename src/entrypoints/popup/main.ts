@@ -1,11 +1,10 @@
 /**
  * @file ポップアップUIのメインスクリプト
  * @description ブラウザアクションボタンをクリックしたときに表示されるUI。
- * 追跡中のコメント一覧を表示し、追跡ボタンや通知の設定を提供する。
+ * 追跡中のコメント一覧を表示し、オプションページへのリンクを提供する。
  *
  * 主要機能:
- * - 追跡ボタン表示/非表示切り替え
- * - 通知ON/OFF切り替え
+ * - オプションページを開く歯車ボタン
  * - コメント一覧表示（トピック別にグループ化）
  * - 個別コメント削除、トピック単位での一括削除
  * - 未読クリア（リンククリック時）
@@ -13,13 +12,8 @@
 import './style.css';
 import Logger from '../../utils/logger';
 import { sendMessageSafely } from '../../utils/error-handler';
-import { createToggleSwitch } from './toggle-switch';
 import { renderComments, renderEmpty } from './comment-renderer';
 import type {
-  GetTrackButtonVisibleResponse,
-  SetTrackButtonVisibleResponse,
-  GetCrawlerEnabledResponse,
-  SetCrawlerEnabledResponse,
   GetAllCommentsResponse,
 } from '../../types/messages';
 
@@ -30,6 +24,11 @@ app.innerHTML = `
   <div>
     <div class="popup-header">
       <span class="app-title">ガルちゃん返信チェッカー</span>
+      <button class="settings-btn" title="設定">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 20 20" fill="#aaa">
+          <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/>
+        </svg>
+      </button>
     </div>
     <div class="card">
       <div id="comments-list"></div>
@@ -37,7 +36,6 @@ app.innerHTML = `
   </div>
 `;
 
-const headerEl = document.querySelector<HTMLElement>('.popup-header')!;
 const listEl   = document.getElementById('comments-list') as HTMLElement;
 
 // ---- コメントリスト読み込み・描画 -------------------------------------------
@@ -61,69 +59,12 @@ async function loadAndRender(): Promise<void> {
   }
 }
 
-// ---- ヘッダースイッチ初期化 -------------------------------------------------
+// ---- 歯車ボタン（設定） -------------------------------------------------------
 
-/**
- * 追跡ボタン表示 ON/OFF スイッチを初期化してヘッダーに追加する
- */
-async function initTrackButtonToggle(): Promise<void> {
-  try {
-    const response = await sendMessageSafely<GetTrackButtonVisibleResponse>({
-      type: 'get-track-button-visible',
-    });
-    const visible = response?.visible ?? true;
-
-    const el = createToggleSwitch({
-      label: '追跡ボタン',
-      statusOn: '表示',
-      statusOff: '非表示',
-      checked: visible,
-      containerClass: 'track-button-toggle-container',
-      labelClass: 'track-button-label',
-      statusClass: 'track-button-status',
-      onChange: async (checked) => {
-        await sendMessageSafely<SetTrackButtonVisibleResponse>({
-          type: 'set-track-button-visible',
-          visible: checked,
-        });
-      },
-    });
-    headerEl.appendChild(el);
-  } catch (e) {
-    Logger.error('追跡ボタンスイッチの初期化に失敗しました', e);
-  }
-}
-
-/**
- * 通知（クローラー）ON/OFF スイッチを初期化してヘッダーに追加する
- */
-async function initCrawlerToggle(): Promise<void> {
-  try {
-    const response = await sendMessageSafely<GetCrawlerEnabledResponse>({
-      type: 'get-crawler-enabled',
-    });
-    const enabled = response?.enabled ?? true;
-
-    const el = createToggleSwitch({
-      label: '通知',
-      statusOn: 'ON',
-      statusOff: 'OFF',
-      checked: enabled,
-      containerClass: 'crawler-toggle-container',
-      labelClass: 'crawler-label',
-      statusClass: 'crawler-status',
-      onChange: async (checked) => {
-        await sendMessageSafely<SetCrawlerEnabledResponse>({
-          type: 'set-crawler-enabled',
-          enabled: checked,
-        });
-      },
-    });
-    headerEl.appendChild(el);
-  } catch (e) {
-    Logger.error('クローラースイッチの初期化に失敗しました', e);
-  }
-}
+document.querySelector<HTMLButtonElement>('.settings-btn')!
+  .addEventListener('click', () => {
+    browser.runtime.openOptionsPage();
+  });
 
 // ---- 初期化 & メッセージ受信 ------------------------------------------------
 
@@ -135,10 +76,6 @@ browser.runtime.onMessage.addListener((msg: { type: string }) => {
   }
 });
 
-// ヘッダースイッチとコメントリストを並行初期化
-(async () => {
-  await initTrackButtonToggle();
-  await initCrawlerToggle();
-  await loadAndRender();
-})();
+// コメントリストを初期化
+loadAndRender();
 

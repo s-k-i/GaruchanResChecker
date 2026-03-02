@@ -18,7 +18,7 @@ import {
   PAGE_IDENTIFIERS,
   TEXT_REPLACEMENTS,
 } from '../constants/app-config';
-import type { GetSessionResponse, SetSessionResponse, UpsertCommentResponse } from '../types/messages';
+import type { GetSessionResponse, SetSessionResponse, UpsertCommentResponse, GetAutoTrackPostResponse } from '../types/messages';
 
 /**
  * コメント投稿内容の確認ページからコメント本文を取得する
@@ -98,6 +98,15 @@ export default defineContentScript({
 
       // 完了ページパターン
       if (h1.includes(PAGE_IDENTIFIERS.COMMENT_COMPLETION) || !!document.querySelector(SELECTORS.TOPICS_LINK)) {
+        // 自動追跡設定を確認
+        const autoTrackResponse = await sendMessageSafely<GetAutoTrackPostResponse>({
+          type: 'get-auto-track-post',
+        });
+        if (autoTrackResponse?.enabled === false) {
+          Logger.info('自動追跡が無効のため、コメントの追跡をスキップします');
+          return;
+        }
+
         const a = document.querySelector<HTMLAnchorElement>(SELECTORS.TOPICS_LINK);
         const href = a?.href;
         if (!href) {

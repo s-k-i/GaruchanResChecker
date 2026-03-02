@@ -14,6 +14,7 @@ import type {
   ClearUnreadRequest,
   SetCrawlerEnabledRequest,
   SetTrackButtonVisibleRequest,
+  SetAutoTrackPostRequest,
   SetSessionRequest,
   GetSessionRequest,
 } from '../types/messages';
@@ -28,7 +29,7 @@ import {
   fetchResCountForComment,
 } from './crawler-service';
 import { adjustUnread } from './unread-service';
-import { LOCAL_STORAGE_KEYS, SESSION_STORAGE_KEYS } from '../constants/app-config';
+import { LOCAL_STORAGE_KEYS, SETTING_DEFAULTS } from '../constants/app-config';
 import { toLocalKey, toSessionKey } from './storage-service';
 import {
   validateTopicId,
@@ -218,7 +219,7 @@ async function handleSetCrawlerEnabled(message: SetCrawlerEnabledRequest): Promi
  * クローラー有効化取得ハンドラー
  */
 async function handleGetCrawlerEnabled(): Promise<MessageResponse> {
-  const enabled = (await storage.getItem<boolean>(toLocalKey(LOCAL_STORAGE_KEYS.CRAWLER_ENABLED))) ?? true;
+  const enabled = (await storage.getItem<boolean>(toLocalKey(LOCAL_STORAGE_KEYS.CRAWLER_ENABLED))) ?? SETTING_DEFAULTS.CRAWLER_ENABLED;
   return { ok: true, enabled };
 }
 
@@ -236,8 +237,26 @@ async function handleSetTrackButtonVisible(message: SetTrackButtonVisibleRequest
  * 追跡ボタン表示取得ハンドラー
  */
 async function handleGetTrackButtonVisible(): Promise<MessageResponse> {
-  const visible = (await storage.getItem<boolean>(toLocalKey(LOCAL_STORAGE_KEYS.TRACK_BUTTON_VISIBLE))) ?? false;
+  const visible = (await storage.getItem<boolean>(toLocalKey(LOCAL_STORAGE_KEYS.TRACK_BUTTON_VISIBLE))) ?? SETTING_DEFAULTS.TRACK_BUTTON_VISIBLE;
   return { ok: true, visible };
+}
+
+/**
+ * 投稿コメントの自動追跡設定ハンドラー
+ */
+async function handleSetAutoTrackPost(message: SetAutoTrackPostRequest): Promise<MessageResponse> {
+  const { enabled } = message;
+  await storage.setItem(toLocalKey(LOCAL_STORAGE_KEYS.AUTO_TRACK_POST_ENABLED), enabled);
+  Logger.info('自動追跡設定を変更しました', { enabled });
+  return { ok: true };
+}
+
+/**
+ * 投稿コメントの自動追跡取得ハンドラー
+ */
+async function handleGetAutoTrackPost(): Promise<MessageResponse> {
+  const enabled = (await storage.getItem<boolean>(toLocalKey(LOCAL_STORAGE_KEYS.AUTO_TRACK_POST_ENABLED))) ?? SETTING_DEFAULTS.AUTO_TRACK_POST_ENABLED;
+  return { ok: true, enabled };
 }
 
 /**
@@ -296,6 +315,12 @@ export async function routeMessage(
 
       case 'get-track-button-visible':
         return await handleGetTrackButtonVisible();
+
+      case 'set-auto-track-post':
+        return await handleSetAutoTrackPost(message);
+
+      case 'get-auto-track-post':
+        return await handleGetAutoTrackPost();
 
       case 'set-session':
         return await handleSetSession(message);
