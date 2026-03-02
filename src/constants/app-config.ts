@@ -8,7 +8,7 @@
  */
 export const CRAWLER_CONFIG = {
   /** コメント1件チェックごとの待機時間（ミリ秒） */
-  ACTIVE_DELAY_MS: 3000,
+  ACTIVE_DELAY_MS: 5000,
   /** スキップする経過日数 */
   SKIP_AFTER_DAYS: 31,
   /** クローラーアラーム名 */
