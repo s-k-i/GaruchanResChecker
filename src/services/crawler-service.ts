@@ -4,7 +4,6 @@
  */
 import { storage } from '#imports';
 import Logger from '../utils/logger';
-import { calculatePageNumber } from '../utils/pagination';
 import { sleep } from '../utils/async';
 import { parseJstDate } from '../utils/date';
 import type { CommentEntry } from '../types/comment';
@@ -13,7 +12,7 @@ import {
   saveComment,
 } from './comment-service';
 import { adjustUnread, computeNewUnreadCount } from './unread-service';
-import { parseResCountFromHtml } from './html-parser-service';
+import { countRepliesFromCommentPageHtml } from './html-parser-service';
 import { type FetchResult, handleFetchError } from './backoff-strategy';
 import {
   SITE_CONFIG,
@@ -32,15 +31,6 @@ let isCrawling = false;
 
 /**
  * 指定したコメントの返信数を取得する
- * @description girlschannel.netのトピックページからHTMLを取得し、
- * node-html-parserを使用してDOMをパースし、返信数を抽出する。
- * ページ番号はコメント番号から動的に算出する。
- *
- * 処理フロー:
- * 1. コメント番号からページ番号を算出
- * 2. 該当ページのHTMLをfetch
- * 3. HTMLをパースして該当コメント要素を検索
- * 4. 返信数のテキストから数値を抽出
  * @param topicId - トピック ID
  * @param commentNumber - コメント番号
  * @returns FetchResult（正常時は count、失敗時は status コード）
@@ -55,10 +45,7 @@ export async function fetchResCountForComment(
     return { ok: false, errorType: 'validation' };
   }
 
-  // ページ番号を動的に計算
-  const pageNumber = calculatePageNumber(commentNumber);
-
-  const basePath = `/topics/${topicId}/${pageNumber === '1' ? '' : `${pageNumber}/`}`;
+  const basePath = `/comment/${topicId}/${commentNumber}/`;
   const url = buildSafeUrl(SITE_CONFIG.BASE_URL, basePath);
 
   const controller = new AbortController();
@@ -68,7 +55,7 @@ export async function fetchResCountForComment(
   );
 
   try {
-    Logger.debug('返信数取得のため fetch を開始', { url, topicId, commentNumber, pageNumber });
+    Logger.debug('返信数取得のため fetch を開始', { url, topicId, commentNumber });
     const res = await fetch(url, { signal: controller.signal });
     Logger.debug('fetch レスポンス', {
       url,
@@ -102,10 +89,9 @@ export async function fetchResCountForComment(
     const text = await res.text();
     Logger.debug('fetch で取得した HTML の先頭', { url, htmlHead: text.slice(0, 300) });
 
-    // node-html-parser でローカルパース
     try {
-      const count = parseResCountFromHtml(text, commentNumber);
-      if (count !== null) return { ok: true, count };
+      const count = countRepliesFromCommentPageHtml(text);
+      return { ok: true, count };
     } catch (e) {
       Logger.warn('node-html-parser でのパースに失敗しました', e);
       Logger.error('返信数を取得できませんでした');
@@ -130,9 +116,6 @@ export async function fetchResCountForComment(
   } finally {
     clearTimeout(timeoutId);
   }
-
-  // パース結果が null（コメント要素は存在するがパターン不一致）
-  return { ok: false, errorType: 'parse' };
 }
 
 /**
