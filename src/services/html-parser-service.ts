@@ -7,8 +7,9 @@ import Logger from '../utils/logger';
 import { SELECTORS } from '../constants/app-config';
 
 /**
- * コメントページのHTML文字列から返信数をカウントする
+ * コメントページのHTML文字列から返信数をカウントする（node-html-parser版）
  * @description node-html-parser でパースし、`ul.res-comment` 内の `.comment-item` 要素数を返す。
+ * 注: 同等のロジックがコンテンツスクリプト側にもある（ブラウザDOM版）が、実行コンテキストが異なるため統合していない。
  * @param html - コメントページのHTML文字列
  * @returns 返信数（返信領域が見つからない場合は 0）
  */

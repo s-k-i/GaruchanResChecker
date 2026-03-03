@@ -162,12 +162,15 @@ export default defineBackground(() => {
     await scheduleNextCrawl();
   });
 
-  // アラーム初期設定（SW 再起動のたびに呼ばれるが、既存アラームがあれば再登録しない）
+  // 設定デフォルト値の初期化 & クローラーアラーム初期設定
+  initializeDefaultSettings();
   initializeCrawlerAlarm();
 
-  async function initializeCrawlerAlarm(): Promise<void> {
+  /**
+   * 未設定の設定項目にデフォルト値を書き込む（初回インストール時用）
+   */
+  async function initializeDefaultSettings(): Promise<void> {
     try {
-      // 初回デフォルト: 未設定の場合は SETTING_DEFAULTS の値で初期化する
       const settingEntries: Array<[`local:${string}`, boolean]> = [
         [toLocalKey(LOCAL_STORAGE_KEYS.CRAWLER_ENABLED), SETTING_DEFAULTS.CRAWLER_ENABLED],
         [toLocalKey(LOCAL_STORAGE_KEYS.TRACK_BUTTON_VISIBLE), SETTING_DEFAULTS.TRACK_BUTTON_VISIBLE],
@@ -180,8 +183,16 @@ export default defineBackground(() => {
         }
       }
       Logger.info('設定のデフォルト値を初期化しました', SETTING_DEFAULTS);
+    } catch (e) {
+      Logger.error('設定のデフォルト値の初期化に失敗しました', e);
+    }
+  }
 
-      // 既存アラームがなければ新規登録（SW 再起動毎に重複登録されるのを防ぐ）
+  /**
+   * クローラーアラームを初期設定する（既存アラームがなければ新規登録）
+   */
+  async function initializeCrawlerAlarm(): Promise<void> {
+    try {
       const existing = await browser.alarms.get(CRAWLER_CONFIG.ALARM_NAME);
       if (!existing) {
         await scheduleNextCrawl();
@@ -206,7 +217,13 @@ export default defineBackground(() => {
         const response = await routeMessage(message);
         // 追跡ボタン表示状態が変更された場合は全タブに通知
         if (message.type === MESSAGE_TYPES.SET_TRACK_BUTTON_VISIBLE && response.ok) {
-          broadcastTrackButtonVisibility(message.visible);
+          broadcastToContentTabs({ type: MESSAGE_TYPES.TRACK_BUTTON_VISIBILITY_CHANGED, visible: message.visible });
+        }
+        if (
+          (message.type === MESSAGE_TYPES.SET_COMMENT_FONT_SIZE || message.type === MESSAGE_TYPES.SET_COMMENT_FONT_COLOR) &&
+          response.ok
+        ) {
+          broadcastToContentTabs({ type: MESSAGE_TYPES.COMMENT_STYLE_CHANGED });
         }
         sendResponse(response);
       })();
@@ -238,10 +255,10 @@ export default defineBackground(() => {
 });
 
 /**
- * 追跡ボタン表示状態を全タブにブロードキャストする
- * @param visible - 追跡ボタンの表示状態
+ * 対象サイトの全タブにメッセージをブロードキャストする
+ * @param message - 送信するメッセージオブジェクト
  */
-async function broadcastTrackButtonVisibility(visible: boolean): Promise<void> {
+async function broadcastToContentTabs(message: object): Promise<void> {
   try {
     const tabs = await browser.tabs.query({ url: [
       `${SITE_CONFIG.BASE_URL}${URL_PATTERNS.TOPICS}*`,
@@ -249,17 +266,10 @@ async function broadcastTrackButtonVisibility(visible: boolean): Promise<void> {
     ] });
     for (const tab of tabs) {
       if (!tab.id) continue;
-      browser.tabs
-        .sendMessage(tab.id, {
-          type: MESSAGE_TYPES.TRACK_BUTTON_VISIBILITY_CHANGED,
-          visible,
-        })
-        .catch(() => {
-          // タブが閉じている場合などは無視
-        });
+      browser.tabs.sendMessage(tab.id, message).catch(() => {});
     }
   } catch (e) {
-    Logger.error('追跡ボタン表示変更のブロードキャストに失敗しました', e);
+    Logger.error('ブロードキャストに失敗しました', e);
   }
 }
 

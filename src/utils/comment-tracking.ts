@@ -41,8 +41,9 @@ function extractCommentBody(element: Element): string {
 }
 
 /**
- * コメントページの返信数をカウントする
+ * コメントページの返信数をカウントする（ブラウザDOM版）
  * @description `ul.res-comment` 内の `.comment-item` 要素をカウントする。
+ * 注: 同等のロジックがバックグラウンド側にもある（node-html-parser版）が、実行コンテキストが異なるため統合していない。
  * @returns 返信数（見つからない場合は 0）
  */
 function countRepliesOnCommentPage(): number {

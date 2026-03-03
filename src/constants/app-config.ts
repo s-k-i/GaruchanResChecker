@@ -42,6 +42,10 @@ export const LOCAL_STORAGE_KEYS = {
   TRACK_BUTTON_VISIBLE: 'track-button:visible',
   /** 投稿コメントの自動追跡 */
   AUTO_TRACK_POST_ENABLED: 'auto-track-post:enabled',
+  /** コメント文字サイズ */
+  COMMENT_FONT_SIZE: 'comment-style:font-size',
+  /** コメント文字色 */
+  COMMENT_FONT_COLOR: 'comment-style:font-color',
 } as const;
 
 /**
@@ -54,6 +58,30 @@ export const SETTING_DEFAULTS = {
   TRACK_BUTTON_VISIBLE: false,
   /** 投稿コメントの自動追跡 */
   AUTO_TRACK_POST_ENABLED: true,
+  /** コメント文字サイズ（空文字 = サイト準拠） */
+  COMMENT_FONT_SIZE: '',
+  /** コメント文字色（空文字 = サイト準拠） */
+  COMMENT_FONT_COLOR: '',
+} as const;
+
+/**
+ * コメントスタイル選択肢
+ */
+export const COMMENT_STYLE_OPTIONS = {
+  /** 文字サイズの選択肢 */
+  FONT_SIZES: [
+    { value: '12px', label: '12px' },
+    { value: '14px', label: '14px' },
+    { value: '16px', label: '16px (標準)' },
+    { value: '18px', label: '18px' },
+    { value: '20px', label: '20px' },
+  ],
+  /** 文字色の選択肢 */
+  FONT_COLORS: [
+    { value: '#666', label: 'グレー (標準)' },
+    { value: '#000', label: 'ブラック' },
+    { value: '#ff6c74', label: 'ピンク' },
+  ],
 } as const;
 
 /**
@@ -65,7 +93,7 @@ export const SETTING_DEFAULTS = {
 export const SESSION_STORAGE_KEYS = {
   /** クローラーバックオフ解除時刻（Unixミリ秒） */
   CRAWLER_BACKOFF_UNTIL: 'crawler:backoffUntil',
-  /** 500/503の連続エラー回数 */
+  /** 500/502/503の連続エラー回数 */
   CRAWLER_SERVER_ERROR_COUNT: 'crawler:serverErrorCount',
 } as const;
 
@@ -108,7 +136,7 @@ export const SELECTORS = {
   /** コメントアイテム */
   COMMENT_ITEM: '.comment-item',
   /** コメント本文 */
-  COMMENT_BODY: '.body.lv1, .body.lv2, .body.lv3, .body.lv4, .body',
+  COMMENT_BODY: '.body.lv1, .body.lv2, .body.lv3, .body.lv4',
   /** 返信カウント */
   RES_COUNT: '.res-count .res-count-btn, .res-count-btn, .res-count a',
   /** 投稿日時 */
@@ -185,11 +213,11 @@ export const REGEX_PATTERNS = {
  * HTTPエラーハンドリング設定
  */
 export const ERROR_HANDLING_CONFIG = {
-  /** 403検出時のバックオフ時間（ms）: 1時間 */
+  /** 403/429検出時のバックオフ時間（ms）: 1時間 */
   FORBIDDEN_BACKOFF_MS: 60 * 60 * 1000,
-  /** 500/503の1回目バックオフ基準時間（ms）: 5分 */
+  /** 500/502/503の1回目バックオフ基準時間（ms）: 5分 */
   SERVER_ERROR_BASE_DELAY_MS: 5 * 60 * 1000,
-  /** 500/503バックオフの上限（ms）: 1時間 */
+  /** 500/502/503バックオフの上限（ms）: 1時間 */
   SERVER_ERROR_MAX_DELAY_MS: 60 * 60 * 1000,
   /** fetch のタイムアウト時間（ms）: 15秒 */
   FETCH_TIMEOUT_MS: 15_000,
@@ -233,8 +261,14 @@ export const MESSAGE_TYPES = {
   TRACK_FROM_CONTEXT_MENU: 'track-from-context-menu',
   /** 追跡ボタン表示状態変更通知（background → content script ブロードキャスト） */
   TRACK_BUTTON_VISIBILITY_CHANGED: 'track-button-visibility-changed',
+  /** コメントスタイル変更通知（background → content script ブロードキャスト） */
+  COMMENT_STYLE_CHANGED: 'comment-style-changed',
   /** 追跡ボタン表示状態設定リクエスト（popup/content → background） */
   SET_TRACK_BUTTON_VISIBLE: 'set-track-button-visible',
+  /** コメント文字サイズ設定リクエスト */
+  SET_COMMENT_FONT_SIZE: 'set-comment-font-size',
+  /** コメント文字色設定リクエスト */
+  SET_COMMENT_FONT_COLOR: 'set-comment-font-color',
 } as const;
 
 /**

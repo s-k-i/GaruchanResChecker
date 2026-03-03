@@ -81,3 +81,42 @@ body {
   color: #213547;
   transition: color 0.15s;
 }
+
+/* チェックボックス＋セレクトボックス複合 */
+.option-checkbox-select-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #eee;
+}
+
+.option-checkbox-select-container:last-child {
+  border-bottom: none;
+}
+
+.option-select-inline {
+  flex-shrink: 0;
+  margin-left: 0.75rem;
+}
+
+.option-select {
+  font-size: 0.85rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+  color: #213547;
+  cursor: pointer;
+}
+
+.option-select:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.option-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}

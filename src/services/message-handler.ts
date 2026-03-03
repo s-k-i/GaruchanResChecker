@@ -15,6 +15,8 @@ import type {
   SetCrawlerEnabledRequest,
   SetTrackButtonVisibleRequest,
   SetAutoTrackPostRequest,
+  SetCommentFontSizeRequest,
+  SetCommentFontColorRequest,
   SetSessionRequest,
   GetSessionRequest,
 } from '../types/messages';
@@ -29,7 +31,7 @@ import {
   fetchResCountForComment,
 } from './crawler-service';
 import { adjustUnread } from './unread-service';
-import { LOCAL_STORAGE_KEYS, SETTING_DEFAULTS } from '../constants/app-config';
+import { LOCAL_STORAGE_KEYS, SETTING_DEFAULTS, COMMENT_STYLE_OPTIONS } from '../constants/app-config';
 import { toLocalKey, toSessionKey } from './storage-service';
 import {
   validateTopicId,
@@ -260,6 +262,52 @@ async function handleGetAutoTrackPost(): Promise<MessageResponse> {
 }
 
 /**
+ * コメント文字サイズ設定ハンドラー
+ */
+async function handleSetCommentFontSize(message: SetCommentFontSizeRequest): Promise<MessageResponse> {
+  const { fontSize } = message;
+  // 空文字（無効化）または許可リストの値のみ受け付ける
+  const allowedSizes: readonly string[] = COMMENT_STYLE_OPTIONS.FONT_SIZES.map((o) => o.value);
+  if (fontSize !== '' && !allowedSizes.includes(fontSize)) {
+    return { ok: false, error: '無効な文字サイズです' };
+  }
+  await storage.setItem(toLocalKey(LOCAL_STORAGE_KEYS.COMMENT_FONT_SIZE), fontSize);
+  Logger.info('コメント文字サイズを設定しました', { fontSize });
+  return { ok: true };
+}
+
+/**
+ * コメント文字サイズ取得ハンドラー
+ */
+async function handleGetCommentFontSize(): Promise<MessageResponse> {
+  const fontSize = (await storage.getItem<string>(toLocalKey(LOCAL_STORAGE_KEYS.COMMENT_FONT_SIZE))) ?? SETTING_DEFAULTS.COMMENT_FONT_SIZE;
+  return { ok: true, fontSize };
+}
+
+/**
+ * コメント文字色設定ハンドラー
+ */
+async function handleSetCommentFontColor(message: SetCommentFontColorRequest): Promise<MessageResponse> {
+  const { fontColor } = message;
+  // 空文字（無効化）または許可リストの値のみ受け付ける
+  const allowedColors: readonly string[] = COMMENT_STYLE_OPTIONS.FONT_COLORS.map((o) => o.value);
+  if (fontColor !== '' && !allowedColors.includes(fontColor)) {
+    return { ok: false, error: '無効な文字色です' };
+  }
+  await storage.setItem(toLocalKey(LOCAL_STORAGE_KEYS.COMMENT_FONT_COLOR), fontColor);
+  Logger.info('コメント文字色を設定しました', { fontColor });
+  return { ok: true };
+}
+
+/**
+ * コメント文字色取得ハンドラー
+ */
+async function handleGetCommentFontColor(): Promise<MessageResponse> {
+  const fontColor = (await storage.getItem<string>(toLocalKey(LOCAL_STORAGE_KEYS.COMMENT_FONT_COLOR))) ?? SETTING_DEFAULTS.COMMENT_FONT_COLOR;
+  return { ok: true, fontColor };
+}
+
+/**
  * セッション設定ハンドラー
  */
 async function handleSetSession(message: SetSessionRequest): Promise<MessageResponse> {
@@ -321,6 +369,18 @@ export async function routeMessage(
 
       case 'get-auto-track-post':
         return await handleGetAutoTrackPost();
+
+      case 'set-comment-font-size':
+        return await handleSetCommentFontSize(message);
+
+      case 'get-comment-font-size':
+        return await handleGetCommentFontSize();
+
+      case 'set-comment-font-color':
+        return await handleSetCommentFontColor(message);
+
+      case 'get-comment-font-color':
+        return await handleGetCommentFontColor();
 
       case 'set-session':
         return await handleSetSession(message);

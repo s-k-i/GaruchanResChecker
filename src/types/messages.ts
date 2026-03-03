@@ -156,6 +156,50 @@ export interface GetAutoTrackPostResponse extends BaseResponse {
 }
 
 /**
+ * コメント文字サイズ設定リクエスト
+ * @description コメントの文字サイズを一律変更する設定
+ */
+export interface SetCommentFontSizeRequest extends BaseMessage {
+  type: 'set-comment-font-size';
+  fontSize: string;
+}
+
+export interface SetCommentFontSizeResponse extends BaseResponse {}
+
+/**
+ * コメント文字サイズ取得リクエスト
+ */
+export interface GetCommentFontSizeRequest extends BaseMessage {
+  type: 'get-comment-font-size';
+}
+
+export interface GetCommentFontSizeResponse extends BaseResponse {
+  fontSize: string;
+}
+
+/**
+ * コメント文字色設定リクエスト
+ * @description コメントの文字色を一律変更する設定
+ */
+export interface SetCommentFontColorRequest extends BaseMessage {
+  type: 'set-comment-font-color';
+  fontColor: string;
+}
+
+export interface SetCommentFontColorResponse extends BaseResponse {}
+
+/**
+ * コメント文字色取得リクエスト
+ */
+export interface GetCommentFontColorRequest extends BaseMessage {
+  type: 'get-comment-font-color';
+}
+
+export interface GetCommentFontColorResponse extends BaseResponse {
+  fontColor: string;
+}
+
+/**
  * セッション設定リクエスト
  * @description browser.storage.sessionに一時的なデータを保存する
  */
@@ -209,8 +253,16 @@ export interface TrackButtonVisibilityChangedMessage extends BaseMessage {
 }
 
 /**
+ * コメントスタイル変更通知
+ * @description backgroundからcontent scriptへブロードキャストする通知
+ */
+export interface CommentStyleChangedMessage extends BaseMessage {
+  type: 'comment-style-changed';
+}
+
+/**
  * すべてのメッセージリクエスト型のユニオン
- * @description background scriptで受信可能な全てのメッセージ型
+ * @description background script / content script / popup 間でやり取りされる全てのメッセージ型。
  */
 export type MessageRequest =
   | CrawlNowRequest
@@ -225,11 +277,16 @@ export type MessageRequest =
   | GetTrackButtonVisibleRequest
   | SetAutoTrackPostRequest
   | GetAutoTrackPostRequest
+  | SetCommentFontSizeRequest
+  | GetCommentFontSizeRequest
+  | SetCommentFontColorRequest
+  | GetCommentFontColorRequest
   | SetSessionRequest
   | GetSessionRequest
   | TrackFromContextMenuRequest
   | RefreshPopupMessage
-  | TrackButtonVisibilityChangedMessage;
+  | TrackButtonVisibilityChangedMessage
+  | CommentStyleChangedMessage;
 
 /**
  * すべてのメッセージレスポンス型のユニオン
@@ -248,6 +305,10 @@ export type MessageResponse =
   | GetTrackButtonVisibleResponse
   | SetAutoTrackPostResponse
   | GetAutoTrackPostResponse
+  | SetCommentFontSizeResponse
+  | GetCommentFontSizeResponse
+  | SetCommentFontColorResponse
+  | GetCommentFontColorResponse
   | SetSessionResponse
   | GetSessionResponse
   | TrackFromContextMenuResponse;

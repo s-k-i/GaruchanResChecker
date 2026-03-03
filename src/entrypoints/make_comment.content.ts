@@ -61,7 +61,7 @@ function parseTopicsHref(href: string) {
 export default defineContentScript({
   matches: ['https://girlschannel.net/make_comment/*'],
   async main() {
-    Logger.info('コメント投稿ページを検出しました。');
+    Logger.info('コメント投稿ページを検出しました');
 
     try {
       const topicId = getTopicId(URL_PATTERNS.MAKE_COMMENT);

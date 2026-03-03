@@ -8,6 +8,7 @@ import { addTrackingButtons, trackCommentFromElement, removeTrackingButtons } fr
 import { sendMessageSafely } from './error-handler';
 import { isTrackablePageUrl } from './validation';
 import { MESSAGE_TYPES, SELECTORS } from '../constants/app-config';
+import { injectCommentStyleOverride } from './comment-style-injector';
 import type { SetSessionResponse, MessageRequest } from '../types/messages';
 
 /**
@@ -76,6 +77,9 @@ export async function initTrackingContentScript(options: ContentScriptInitOption
 
     Logger.info('トピック情報を抽出/保存しました', topic);
 
+    // コメントスタイル（文字サイズ・文字色）の上書き注入
+    await injectCommentStyleOverride();
+
     // コメント要素を取得（DOM検索は1回のみ）
     const commentElements = document.querySelectorAll(SELECTORS.COMMENT_ITEM);
 
@@ -100,6 +104,9 @@ export async function initTrackingContentScript(options: ContentScriptInitOption
         } else {
           removeTrackingButtons();
         }
+      }
+      if (message.type === MESSAGE_TYPES.COMMENT_STYLE_CHANGED) {
+        injectCommentStyleOverride();
       }
     });
   } catch (err) {
