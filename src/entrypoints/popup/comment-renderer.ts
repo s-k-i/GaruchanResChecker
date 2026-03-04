@@ -211,9 +211,12 @@ export function renderComments(
     listEl.appendChild(notification);
   }
 
-  // トピックIDでグループ化してレンダリング
+  // トピックIDでグループ化してレンダリング（トピックID 降順）
   const grouped = groupByTopic(comments);
-  for (const [topicId, group] of Object.entries(grouped)) {
+  const sortedEntries = Object.entries(grouped).sort(
+    ([a], [b]) => parseInt(b, 10) - parseInt(a, 10)
+  );
+  for (const [topicId, group] of sortedEntries) {
     listEl.appendChild(createTopicGroupElement(topicId, group, onRefresh));
   }
 }
