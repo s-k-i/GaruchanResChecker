@@ -55,7 +55,7 @@ export const SETTING_DEFAULTS = {
   /** クローラー（返信通知）有効化 */
   CRAWLER_ENABLED: true,
   /** 追跡ボタン表示 */
-  TRACK_BUTTON_VISIBLE: false,
+  TRACK_BUTTON_VISIBLE: true,
   /** 投稿コメントの自動追跡 */
   AUTO_TRACK_POST_ENABLED: true,
   /** コメント文字サイズ（空文字 = サイト準拠） */
