@@ -261,6 +261,20 @@ export interface CommentStyleChangedMessage extends BaseMessage {
 }
 
 /**
+ * エラーレポートリクエスト
+ * @description content scriptからbackgroundへエラー情報を中継し、Sentryに送信する
+ */
+export interface ReportErrorRequest extends BaseMessage {
+  type: 'report-error';
+  message: string;
+  context: string;
+  stack?: string;
+  detail?: unknown;
+}
+
+export interface ReportErrorResponse extends BaseResponse {}
+
+/**
  * すべてのメッセージリクエスト型のユニオン
  * @description background script / content script / popup 間でやり取りされる全てのメッセージ型。
  */
@@ -286,7 +300,8 @@ export type MessageRequest =
   | TrackFromContextMenuRequest
   | RefreshPopupMessage
   | TrackButtonVisibilityChangedMessage
-  | CommentStyleChangedMessage;
+  | CommentStyleChangedMessage
+  | ReportErrorRequest;
 
 /**
  * すべてのメッセージレスポンス型のユニオン
@@ -311,4 +326,5 @@ export type MessageResponse =
   | GetCommentFontColorResponse
   | SetSessionResponse
   | GetSessionResponse
-  | TrackFromContextMenuResponse;
+  | TrackFromContextMenuResponse
+  | ReportErrorResponse;

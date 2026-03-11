@@ -17,6 +17,7 @@
  * - ストレージ操作 → storage-service
  */
 import Logger from '../utils/logger';
+import { initSentry } from '../services/sentry-service';
 import { storage } from '#imports';
 import { updateIconForTab } from '../utils/icon-manager';
 import type { MessageRequest, MessageResponse } from '../types/messages';
@@ -57,6 +58,7 @@ async function scheduleNextCrawl(): Promise<void> {
 }
 
 export default defineBackground(() => {
+  initSentry('background');
   Logger.info('バックグラウンドを初期化しました', { id: browser.runtime.id });
 
   // Content Script から storage.session へのアクセスを許可する

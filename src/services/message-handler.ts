@@ -19,7 +19,9 @@ import type {
   SetCommentFontColorRequest,
   SetSessionRequest,
   GetSessionRequest,
+  ReportErrorRequest,
 } from '../types/messages';
+import { captureRelayedError } from './sentry-service';
 import {
   getAllCommentsFromCache,
   getCommentFromCache,
@@ -327,6 +329,14 @@ async function handleGetSession(message: GetSessionRequest): Promise<MessageResp
 }
 
 /**
+ * Content Script から中継されたエラーを Sentry に送信するハンドラー
+ */
+function handleReportError(message: ReportErrorRequest): MessageResponse {
+  captureRelayedError(message.message, message.context, message.stack, message.detail);
+  return { ok: true };
+}
+
+/**
  * メッセージをルーティングして適切なハンドラーに振り分ける
  */
 export async function routeMessage(
@@ -387,6 +397,9 @@ export async function routeMessage(
 
       case 'get-session':
         return await handleGetSession(message);
+
+      case 'report-error':
+        return handleReportError(message);
 
       default:
         Logger.warn('未知のメッセージタイプを受信しました', { type: message.type });

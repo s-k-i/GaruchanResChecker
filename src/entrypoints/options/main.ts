@@ -10,6 +10,7 @@
 import './style.css';
 import Logger from '../../utils/logger';
 import { sendMessageSafely } from '../../utils/error-handler';
+import { initSentry } from '../../services/sentry-service';
 import { SETTING_DEFAULTS, COMMENT_STYLE_OPTIONS } from '../../constants/app-config';
 import type {
   GetTrackButtonVisibleResponse,
@@ -18,6 +19,8 @@ import type {
   GetCommentFontSizeResponse,
   GetCommentFontColorResponse,
 } from '../../types/messages';
+
+initSentry('options');
 
 // ---- 設定項目定義 -------------------------------------------------------------
 

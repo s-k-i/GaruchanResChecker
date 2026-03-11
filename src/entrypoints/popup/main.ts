@@ -12,10 +12,13 @@
 import './style.css';
 import Logger from '../../utils/logger';
 import { sendMessageSafely } from '../../utils/error-handler';
+import { initSentry } from '../../services/sentry-service';
 import { renderComments, renderEmpty } from './comment-renderer';
 import type {
   GetAllCommentsResponse,
 } from '../../types/messages';
+
+initSentry('popup');
 
 // ---- DOM 構造 ---------------------------------------------------------------
 
