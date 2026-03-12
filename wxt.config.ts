@@ -41,12 +41,11 @@ export default defineConfig({
         host_permissions: [
             'https://girlschannel.net/*',
             // Sentry のエラーレポート送信先（Service Worker からの fetch に必要）
-            'https://*.ingest.sentry.io/*',
             'https://*.ingest.us.sentry.io/*',
         ],
         // Popup / Options ページの CSP: Sentry への接続を許可
         content_security_policy: {
-            extension_pages: "script-src 'self'; object-src 'self'; connect-src 'self' https://girlschannel.net https://*.ingest.sentry.io https://*.ingest.us.sentry.io;",
+            extension_pages: "script-src 'self'; object-src 'self'; connect-src 'self' https://girlschannel.net https://*.ingest.us.sentry.io;",
         },
         web_accessible_resources: [
             {
